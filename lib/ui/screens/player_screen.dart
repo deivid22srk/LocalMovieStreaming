@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_vlc_player/flutter_vlc_player.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 import 'package:flutter/services.dart';
 import 'package:pip_view/pip_view.dart';
 
@@ -23,39 +24,15 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  late VlcPlayerController _vlcViewController;
-  bool _showControls = true;
-  double _aspectRatio = 16 / 9;
-  bool _hasSeeked = false;
-  Timer? _hideTimer;
+  VideoPlayerController? _videoPlayerController;
+  ChewieController? _chewieController;
+  bool _hasError = false;
+  String _errorMsg = '';
 
   @override
   void initState() {
     super.initState();
-    _vlcViewController = VlcPlayerController.network(
-      widget.videoUrl,
-      hwAcc: HwAcc.full,
-      autoPlay: true,
-      options: VlcPlayerOptions(
-         advanced: VlcAdvancedOptions([
-           VlcAdvancedOptions.networkCaching(1500),
-           '--file-caching=1500',
-           '--live-caching=1500',
-           '--clock-jitter=0',
-           '--clock-synchro=0',
-           '--no-stats',
-           '--no-video-title-show',
-           '--rtsp-tcp',
-         ]),
-         http: VlcHttpOptions([
-           VlcHttpOptions.httpReconnect(true),
-           '--http-continuous',
-         ]),
-      ),
-    );
-
-    _vlcViewController.addListener(_onVlcChange);
-    _startHideTimer();
+    _initializePlayer();
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     SystemChrome.setPreferredOrientations([
@@ -64,59 +41,57 @@ class _PlayerScreenState extends State<PlayerScreen> {
     ]);
   }
 
-  void _onVlcChange() {
-    if (_vlcViewController.value.isInitialized && !_hasSeeked && widget.initialPosition > Duration.zero) {
-      _hasSeeked = true;
-      // Use a small delay to ensure player is ready to seek
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) _vlcViewController.setTime(widget.initialPosition.inMilliseconds);
+  Future<void> _initializePlayer() async {
+    try {
+      _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
+
+      await _videoPlayerController!.initialize();
+
+      _chewieController = ChewieController(
+        videoPlayerController: _videoPlayerController!,
+        autoPlay: true,
+        looping: false,
+        startAt: widget.initialPosition,
+        aspectRatio: _videoPlayerController!.value.aspectRatio,
+        showControls: true,
+        materialProgressColors: ChewieProgressColors(
+          playedColor: Colors.purple,
+          handleColor: Colors.purpleAccent,
+          backgroundColor: Colors.white24,
+          bufferedColor: Colors.white54,
+        ),
+        placeholder: Container(color: Colors.black),
+        autoInitialize: true,
+        errorBuilder: (context, errorMessage) {
+          return Center(
+            child: Text(
+              errorMessage,
+              style: const TextStyle(color: Colors.white),
+            ),
+          );
+        },
+      );
+      setState(() {});
+    } catch (e) {
+      setState(() {
+        _hasError = true;
+        _errorMsg = e.toString();
       });
     }
-    if (mounted) setState(() {});
-  }
-
-  void _startHideTimer() {
-    _hideTimer?.cancel();
-    _hideTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted) {
-        setState(() => _showControls = false);
-      }
-    });
   }
 
   @override
   void dispose() {
-    _hideTimer?.cancel();
-    _vlcViewController.removeListener(_onVlcChange);
-    _vlcViewController.getPosition().then((pos) {
-       widget.onProgressUpdate(pos);
-    });
-    _vlcViewController.dispose();
+    if (_videoPlayerController != null) {
+       widget.onProgressUpdate(_videoPlayerController!.value.position);
+    }
+    _videoPlayerController?.dispose();
+    _chewieController?.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
     ]);
     super.dispose();
-  }
-
-  void _toggleControls() {
-    setState(() {
-      _showControls = !_showControls;
-      if (_showControls) _startHideTimer();
-    });
-  }
-
-  void _cycleAspectRatio() {
-    setState(() {
-      if (_aspectRatio == 16 / 9) {
-        _aspectRatio = 21 / 9;
-      } else if (_aspectRatio == 21 / 9) {
-        _aspectRatio = 4 / 3;
-      } else {
-        _aspectRatio = 16 / 9;
-      }
-    });
-    _startHideTimer();
   }
 
   @override
@@ -125,152 +100,50 @@ class _PlayerScreenState extends State<PlayerScreen> {
       builder: (context, isFloating) {
         return Scaffold(
           backgroundColor: Colors.black,
-          body: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: isFloating ? null : _toggleControls,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Center(
-                  child: VlcPlayer(
-                    controller: _vlcViewController,
-                    aspectRatio: _aspectRatio,
-                    placeholder: const Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(color: Colors.purple),
-                          SizedBox(height: 10),
-                          Text('Carregando Stream...', style: TextStyle(color: Colors.white, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                if (_showControls && !isFloating)
-                  _buildControlsOverlay(),
-                if (_vlcViewController.value.hasError)
-                   Center(
-                     child: Container(
-                       padding: const EdgeInsets.all(20),
-                       margin: const EdgeInsets.all(20),
-                       decoration: BoxDecoration(
-                         color: Colors.black87,
-                         borderRadius: BorderRadius.circular(10),
-                         border: Border.all(color: Colors.redAccent),
-                       ),
-                       child: Column(
-                         mainAxisSize: MainAxisSize.min,
-                         children: [
-                           const Icon(Icons.error_outline, color: Colors.red, size: 60),
-                           const SizedBox(height: 10),
-                           const Text('ERRO NO PLAYER VLC', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                           const SizedBox(height: 5),
-                           Text('${_vlcViewController.value.errorDescription}',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                           const SizedBox(height: 20),
-                           ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.white12),
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('VOLTAR', style: TextStyle(color: Colors.white)),
-                           )
-                         ],
-                       ),
-                     ),
-                   ),
-              ],
-            ),
+          appBar: isFloating ? null : AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            title: Text(widget.title, style: const TextStyle(fontSize: 14)),
           ),
+          extendBodyBehindAppBar: true,
+          body: _buildBody(isFloating),
         );
       }
     );
   }
 
-  Widget _buildControlsOverlay() {
-    final position = _vlcViewController.value.position;
-    final duration = _vlcViewController.value.duration;
+  Widget _buildBody(bool isFloating) {
+    if (_hasError) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 60),
+            const SizedBox(height: 10),
+            const Text('ERRO AO CARREGAR VÍDEO', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Text(_errorMsg, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            ),
+            ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('VOLTAR')),
+          ],
+        ),
+      );
+    }
 
-    return Container(
-      color: Colors.black45,
+    if (_chewieController != null && _chewieController!.videoPlayerController.value.isInitialized) {
+       return Chewie(controller: _chewieController!);
+    }
+
+    return const Center(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          AppBar(
-            backgroundColor: Colors.transparent,
-            title: Text(widget.title),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => Navigator.pop(context),
-            ),
-            actions: [
-               IconButton(
-                icon: const Icon(Icons.aspect_ratio),
-                onPressed: _cycleAspectRatio,
-              ),
-            ],
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-               IconButton(
-                iconSize: 64,
-                icon: Icon(
-                   _vlcViewController.value.isPlaying ? Icons.pause : Icons.play_arrow,
-                   color: Colors.white,
-                ),
-                onPressed: () {
-                   setState(() {
-                     _vlcViewController.value.isPlaying
-                        ? _vlcViewController.pause()
-                        : _vlcViewController.play();
-                   });
-                   _startHideTimer();
-                },
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                Slider(
-                  activeColor: Colors.purple,
-                  inactiveColor: Colors.white24,
-                  value: position.inSeconds.toDouble().clamp(0.0, duration.inSeconds.toDouble()),
-                  max: duration.inSeconds.toDouble() > 0 ? duration.inSeconds.toDouble() : 1.0,
-                  onChanged: (value) {
-                    _vlcViewController.setTime(Duration(seconds: value.toInt()).inMilliseconds);
-                    _startHideTimer();
-                  },
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.picture_in_picture, color: Colors.white),
-                      onPressed: () {
-                        PIPView.of(context)!.presentBelow(const SizedBox.shrink());
-                      },
-                    ),
-                    Text(
-                      '${_formatDuration(position)} / ${_formatDuration(duration)}',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+          CircularProgressIndicator(color: Colors.purple),
+          SizedBox(height: 10),
+          Text('Carregando...', style: TextStyle(color: Colors.white, fontSize: 12)),
         ],
       ),
     );
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, "0");
-    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
-    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
-    return "${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds";
   }
 }
