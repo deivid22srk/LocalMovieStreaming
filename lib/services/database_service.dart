@@ -122,6 +122,23 @@ class DatabaseService {
     return List.generate(maps.length, (i) => Series.fromMap(maps[i]));
   }
 
+  Future<void> updateSeries(Series series) async {
+    Database db = await database;
+    await db.update(
+      'series',
+      series.toMap(),
+      where: 'id = ?',
+      whereArgs: [series.id],
+    );
+  }
+
+  Future<void> deleteSeries(int id) async {
+    Database db = await database;
+    // Cascade delete might not be enabled by default, manually delete seasons/episodes is safer
+    await db.delete('seasons', where: 'seriesId = ?', whereArgs: [id]);
+    await db.delete('series', where: 'id = ?', whereArgs: [id]);
+  }
+
   // Season CRUD
   Future<int> insertSeason(Season season) async {
     Database db = await database;

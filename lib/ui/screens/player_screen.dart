@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_vlc_player/flutter_vlc_player.dart';
 import 'package:flutter/services.dart';
@@ -26,6 +27,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _showControls = true;
   double _aspectRatio = 16 / 9;
   bool _hasSeeked = false;
+  Timer? _hideTimer;
 
   @override
   void initState() {
@@ -34,10 +36,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
       widget.videoUrl,
       hwAcc: HwAcc.full,
       autoPlay: true,
-      options: VlcPlayerOptions(),
+      options: VlcPlayerOptions(
+         advanced: VlcAdvancedOptions([
+           VlcAdvancedOptions.networkCaching(2000),
+         ]),
+      ),
     );
 
     _vlcViewController.addListener(_onVlcChange);
+    _startHideTimer();
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     SystemChrome.setPreferredOrientations([
@@ -54,8 +61,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (mounted) setState(() {});
   }
 
+  void _startHideTimer() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() => _showControls = false);
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _hideTimer?.cancel();
     _vlcViewController.removeListener(_onVlcChange);
     _vlcViewController.getPosition().then((pos) {
        widget.onProgressUpdate(pos);
@@ -69,7 +86,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   void _toggleControls() {
-    setState(() => _showControls = !_showControls);
+    setState(() {
+      _showControls = !_showControls;
+      if (_showControls) _startHideTimer();
+    });
   }
 
   void _cycleAspectRatio() {
@@ -82,6 +102,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _aspectRatio = 16 / 9;
       }
     });
+    _startHideTimer();
   }
 
   @override
@@ -91,6 +112,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         return Scaffold(
           backgroundColor: Colors.black,
           body: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: isFloating ? null : _toggleControls,
             child: Stack(
               alignment: Alignment.center,
@@ -104,6 +126,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 ),
                 if (_showControls && !isFloating)
                   _buildControlsOverlay(),
+                if (_vlcViewController.value.hasError)
+                   Center(child: Text('Erro ao carregar vídeo: ${_vlcViewController.value.errorDescription}', style: const TextStyle(color: Colors.red))),
               ],
             ),
           ),
@@ -117,7 +141,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final duration = _vlcViewController.value.duration;
 
     return Container(
-      color: Colors.black38,
+      color: Colors.black45,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -150,6 +174,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         ? _vlcViewController.pause()
                         : _vlcViewController.play();
                    });
+                   _startHideTimer();
                 },
               ),
             ],
@@ -159,10 +184,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
             child: Column(
               children: [
                 Slider(
+                  activeColor: Colors.purple,
+                  inactiveColor: Colors.white24,
                   value: position.inSeconds.toDouble().clamp(0.0, duration.inSeconds.toDouble()),
                   max: duration.inSeconds.toDouble() > 0 ? duration.inSeconds.toDouble() : 1.0,
                   onChanged: (value) {
                     _vlcViewController.setTime(Duration(seconds: value.toInt()).inMilliseconds);
+                    _startHideTimer();
                   },
                 ),
                 Row(

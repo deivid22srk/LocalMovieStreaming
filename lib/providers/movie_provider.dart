@@ -71,6 +71,27 @@ class MovieProvider with ChangeNotifier {
     await fetchMovies();
   }
 
+  Future<void> updateMovieFull(Movie movie) async {
+    final poster = await _saveLocalImage(movie.posterPath);
+    final backdrop = await _saveLocalImage(movie.backdropPath);
+
+    final finalMovie = Movie(
+      id: movie.id,
+      title: movie.title,
+      overview: movie.overview,
+      posterPath: poster,
+      backdropPath: backdrop,
+      videoUrl: movie.videoUrl,
+      voteAverage: movie.voteAverage,
+      releaseDate: movie.releaseDate,
+      watchProgress: movie.watchProgress,
+      duration: movie.duration,
+    );
+
+    await _dbService.updateMovie(finalMovie);
+    await fetchMovies();
+  }
+
   Future<void> updateMovieProgress(int movieId, int progress) async {
     final movieIdx = _movies.indexWhere((m) => m.id == movieId);
     if (movieIdx != -1) {
@@ -91,6 +112,34 @@ class MovieProvider with ChangeNotifier {
        _movies[movieIdx] = updatedMovie;
        notifyListeners();
     }
+  }
+
+  Future<void> deleteMovie(int id) async {
+    await _dbService.deleteMovie(id);
+    await fetchMovies();
+  }
+
+  Future<void> updateSeriesFull(Series series) async {
+    final poster = await _saveLocalImage(series.posterPath);
+    final backdrop = await _saveLocalImage(series.backdropPath);
+
+    final finalSeries = Series(
+      id: series.id,
+      title: series.title,
+      overview: series.overview,
+      posterPath: poster,
+      backdropPath: backdrop,
+      voteAverage: series.voteAverage,
+      firstAirDate: series.firstAirDate,
+    );
+
+    await _dbService.updateSeries(finalSeries);
+    await fetchSeriesList();
+  }
+
+  Future<void> deleteSeries(int id) async {
+    await _dbService.deleteSeries(id);
+    await fetchSeriesList();
   }
 
   Future<void> updateEpisodeProgress(int episodeId, int progress) async {

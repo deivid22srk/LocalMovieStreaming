@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/movie_provider.dart';
 import '../../services/storage_service.dart';
+import 'library_management_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -21,18 +22,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _export() async {
-    final path = await _storageService.exportData();
-    if (path != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Dados exportados com sucesso para: $path')));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Exportando dados... Aguarde.')));
+    final result = await _storageService.exportData();
+    if (result != null) {
+       if (result.contains('Error') || result.contains('failed')) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Falha na exportação: $result'), backgroundColor: Colors.red));
+       } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Dados exportados com sucesso para: $result'), backgroundColor: Colors.green));
+       }
+    } else {
+       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Exportação cancelada.')));
     }
   }
 
   void _import() async {
     final success = await _storageService.importData();
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dados importados com sucesso!')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dados importados com sucesso!'), backgroundColor: Colors.green));
       context.read<MovieProvider>().fetchMovies();
       context.read<MovieProvider>().fetchSeriesList();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Falha na importação ou cancelada.'), backgroundColor: Colors.red));
     }
   }
 
@@ -43,6 +53,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          const Text('Biblioteca', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          ListTile(
+            leading: const Icon(Icons.library_books),
+            title: const Text('Gerenciar Biblioteca'),
+            subtitle: const Text('Edite ou remova filmes e séries já adicionados.'),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryManagementScreen())),
+            tileColor: Colors.white.withOpacity(0.05),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          const SizedBox(height: 30),
           const Text('API TMDB', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           TextField(
@@ -71,7 +92,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             leading: const Icon(Icons.file_upload),
             title: const Text('Exportar dados (ZIP)'),
-            subtitle: const Text('Gera um backup de toda sua biblioteca e progresso.'),
+            subtitle: const Text('Gera um backup de toda sua biblioteca, progresso e imagens.'),
             onTap: _export,
             tileColor: Colors.white.withOpacity(0.05),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
