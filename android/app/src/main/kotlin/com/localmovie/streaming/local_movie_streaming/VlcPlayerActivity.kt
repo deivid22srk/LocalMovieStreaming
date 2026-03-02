@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.view.SurfaceView
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
@@ -49,7 +48,7 @@ class VlcPlayerActivity : AppCompatActivity() {
 
         videoUrl = intent.getStringExtra("url")
         videoTitle = intent.getStringExtra("title")
-        initialPosition = intent.getLongExtra("position", 0)
+        initialPosition = intent.getLongExtra("position", 0L)
 
         videoLayout = findViewById(R.id.video_layout)
         playPauseBtn = findViewById(R.id.play_pause_btn)
@@ -70,9 +69,11 @@ class VlcPlayerActivity : AppCompatActivity() {
         mediaPlayer = MediaPlayer(libVLC)
         mediaPlayer?.attachViews(videoLayout!!, null, true, false)
 
-        val media = Media(libVLC, Uri.parse(videoUrl))
-        mediaPlayer?.media = media
-        media.release()
+        if (videoUrl != null) {
+            val media = Media(libVLC, Uri.parse(videoUrl))
+            mediaPlayer?.media = media
+            media.release()
+        }
 
         mediaPlayer?.play()
         if (initialPosition > 0) {
