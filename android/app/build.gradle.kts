@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.localmovie.streaming.local_movie_streaming"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -22,8 +22,8 @@ android {
 
     defaultConfig {
         applicationId = "com.localmovie.streaming.local_movie_streaming"
-        minSdk = 23
-        targetSdk = 35
+        minSdk = 24
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -38,8 +38,8 @@ android {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 
-    // VLC Android dependency
-    implementation("org.videolan.android:libvlc-all:3.6.0-eap17")
+    // Stable VLC Android dependency
+    implementation("org.videolan.android:libvlc-all:3.5.1")
 }
 
 flutter {
