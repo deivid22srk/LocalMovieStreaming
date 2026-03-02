@@ -22,8 +22,9 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'movie_streaming.db');
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -36,6 +37,7 @@ class DatabaseService {
         posterPath TEXT,
         backdropPath TEXT,
         videoUrl TEXT,
+        webPlayerUrl TEXT,
         voteAverage REAL,
         releaseDate TEXT,
         watchProgress INTEGER,
@@ -76,11 +78,19 @@ class DatabaseService {
         overview TEXT,
         stillPath TEXT,
         videoUrl TEXT,
+        webPlayerUrl TEXT,
         watchProgress INTEGER,
         duration INTEGER,
         FOREIGN KEY (seasonId) REFERENCES seasons (id) ON DELETE CASCADE
       )
     ''');
+  }
+
+  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
+     if (oldVersion < 2) {
+        await db.execute('ALTER TABLE movies ADD COLUMN webPlayerUrl TEXT DEFAULT ""');
+        await db.execute('ALTER TABLE episodes ADD COLUMN webPlayerUrl TEXT DEFAULT ""');
+     }
   }
 
   // Movie CRUD
@@ -134,7 +144,6 @@ class DatabaseService {
 
   Future<void> deleteSeries(int id) async {
     Database db = await database;
-    // Cascade delete might not be enabled by default, manually delete seasons/episodes is safer
     await db.delete('seasons', where: 'seriesId = ?', whereArgs: [id]);
     await db.delete('series', where: 'id = ?', whereArgs: [id]);
   }

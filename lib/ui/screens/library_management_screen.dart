@@ -89,6 +89,7 @@ class _LibraryManagementScreenState extends State<LibraryManagementScreen> {
     final titleCtrl = TextEditingController(text: movie.title);
     final overviewCtrl = TextEditingController(text: movie.overview);
     final urlCtrl = TextEditingController(text: movie.videoUrl);
+    final webUrlCtrl = TextEditingController(text: movie.webPlayerUrl);
     final posterCtrl = TextEditingController(text: movie.posterPath);
     final backdropCtrl = TextEditingController(text: movie.backdropPath);
     final dateCtrl = TextEditingController(text: movie.releaseDate);
@@ -105,6 +106,7 @@ class _LibraryManagementScreenState extends State<LibraryManagementScreen> {
               TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Título')),
               TextField(controller: overviewCtrl, decoration: const InputDecoration(labelText: 'Sinopse'), maxLines: 3),
               TextField(controller: urlCtrl, decoration: const InputDecoration(labelText: 'URL do Vídeo')),
+              TextField(controller: webUrlCtrl, decoration: const InputDecoration(labelText: 'URL Player Web')),
               TextField(controller: dateCtrl, decoration: const InputDecoration(labelText: 'Data de Lançamento')),
               TextField(controller: ratingCtrl, decoration: const InputDecoration(labelText: 'Avaliação (0-10)')),
               const SizedBox(height: 10),
@@ -125,6 +127,7 @@ class _LibraryManagementScreenState extends State<LibraryManagementScreen> {
                 posterPath: posterCtrl.text,
                 backdropPath: backdropCtrl.text,
                 videoUrl: urlCtrl.text,
+                webPlayerUrl: webUrlCtrl.text,
                 voteAverage: double.tryParse(ratingCtrl.text) ?? 0.0,
                 releaseDate: dateCtrl.text,
                 watchProgress: movie.watchProgress,

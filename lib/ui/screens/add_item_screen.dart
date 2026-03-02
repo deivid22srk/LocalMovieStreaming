@@ -23,6 +23,7 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
   final TextEditingController _posterCtrl = TextEditingController();
   final TextEditingController _backdropCtrl = TextEditingController();
   final TextEditingController _manualUrlCtrl = TextEditingController();
+  final TextEditingController _webUrlCtrl = TextEditingController();
   final TextEditingController _dateCtrl = TextEditingController();
 
   List<dynamic> _searchResults = [];
@@ -82,6 +83,7 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
         posterPath: _posterCtrl.text,
         backdropPath: _backdropCtrl.text,
         videoUrl: _manualUrlCtrl.text,
+        webPlayerUrl: _webUrlCtrl.text,
         voteAverage: 0.0,
         releaseDate: _dateCtrl.text,
       ));
@@ -235,8 +237,10 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
           TextField(controller: _titleCtrl, decoration: const InputDecoration(labelText: 'Título')),
           TextField(controller: _overviewCtrl, decoration: const InputDecoration(labelText: 'Sinopse'), maxLines: 3),
           TextField(controller: _dateCtrl, decoration: const InputDecoration(labelText: 'Data de Lançamento (Ex: 2024-01-01)')),
-          if (!_manualIsSeries)
+          if (!_manualIsSeries) ...[
             TextField(controller: _manualUrlCtrl, decoration: const InputDecoration(labelText: 'URL do Vídeo')),
+            TextField(controller: _webUrlCtrl, decoration: const InputDecoration(labelText: 'URL do Player Web (Opcional)')),
+          ],
           const SizedBox(height: 20),
           _buildImagePickerRow('Capa (Poster)', _posterCtrl),
           const SizedBox(height: 10),

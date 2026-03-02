@@ -28,7 +28,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
        if (result.contains('Error') || result.contains('failed')) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Falha na exportação: $result'), backgroundColor: Colors.red));
        } else {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Dados exportados com sucesso para: $result'), backgroundColor: Colors.green));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Backup iniciado via compartilhamento.'), backgroundColor: Colors.green));
        }
     } else {
        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Exportação cancelada.')));
@@ -48,6 +48,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<MovieProvider>();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Configurações')),
       body: ListView(
@@ -60,6 +62,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('Gerenciar Biblioteca'),
             subtitle: const Text('Edite ou remova filmes e séries já adicionados.'),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryManagementScreen())),
+            tileColor: Colors.white.withOpacity(0.05),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          const SizedBox(height: 30),
+          const Text('Player de Vídeo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          SwitchListTile(
+            title: const Text('Utilizar VLC Nativo (Kotlin)'),
+            subtitle: const Text('Se ativado, utiliza o VLC via ponte nativa para maior performance em streams locais.'),
+            value: provider.useNativePlayer,
+            onChanged: (v) => provider.useNativePlayer = v,
             tileColor: Colors.white.withOpacity(0.05),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),

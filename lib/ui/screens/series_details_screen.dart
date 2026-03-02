@@ -6,6 +6,8 @@ import '../../services/database_service.dart';
 import '../../providers/movie_provider.dart';
 import '../widgets/app_image.dart';
 import 'player_screen.dart';
+import 'web_player_screen.dart';
+import '../../services/native_player_service.dart';
 
 class SeriesDetailsScreen extends StatefulWidget {
   final Series series;
@@ -56,6 +58,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
 
   void _addEpisode(Season season) {
     final TextEditingController urlCtrl = TextEditingController();
+    final TextEditingController webUrlCtrl = TextEditingController();
     final TextEditingController titleCtrl = TextEditingController();
     final TextEditingController imageCtrl = TextEditingController();
 
@@ -69,9 +72,10 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
             children: [
               TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Título')),
               TextField(controller: urlCtrl, decoration: const InputDecoration(labelText: 'URL do Vídeo')),
+              TextField(controller: webUrlCtrl, decoration: const InputDecoration(labelText: 'URL Player Web')),
               Row(
                 children: [
-                  Expanded(child: TextField(controller: imageCtrl, decoration: const InputDecoration(labelText: 'Imagem do Episódio (Opcional)'))),
+                  Expanded(child: TextField(controller: imageCtrl, decoration: const InputDecoration(labelText: 'Imagem'))),
                   IconButton(
                     icon: const Icon(Icons.file_open),
                     onPressed: () async {
@@ -96,6 +100,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                  overview: '',
                  stillPath: imageCtrl.text,
                  videoUrl: urlCtrl.text,
+                 webPlayerUrl: webUrlCtrl.text,
                ));
                Navigator.pop(context);
                _loadData();
@@ -109,6 +114,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
 
   void _editEpisode(Episode ep) {
     final TextEditingController urlCtrl = TextEditingController(text: ep.videoUrl);
+    final TextEditingController webUrlCtrl = TextEditingController(text: ep.webPlayerUrl);
     final TextEditingController titleCtrl = TextEditingController(text: ep.title);
     final TextEditingController imageCtrl = TextEditingController(text: ep.stillPath);
 
@@ -122,6 +128,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
             children: [
               TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Título')),
               TextField(controller: urlCtrl, decoration: const InputDecoration(labelText: 'URL do Vídeo')),
+              TextField(controller: webUrlCtrl, decoration: const InputDecoration(labelText: 'URL Player Web')),
               Row(
                 children: [
                   Expanded(child: TextField(controller: imageCtrl, decoration: const InputDecoration(labelText: 'Imagem'))),
@@ -149,6 +156,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                  overview: ep.overview,
                  stillPath: imageCtrl.text,
                  videoUrl: urlCtrl.text,
+                 webPlayerUrl: webUrlCtrl.text,
                  watchProgress: ep.watchProgress,
                  duration: ep.duration,
                );
@@ -161,6 +169,37 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
         ],
       ),
     );
+  }
+
+  void _play(Episode ep, bool useWeb) async {
+    final provider = context.read<MovieProvider>();
+
+    if (useWeb) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => WebPlayerScreen(url: ep.webPlayerUrl, title: '${widget.series.title} - ${ep.title}')),
+      );
+      return;
+    }
+
+    if (provider.useNativePlayer) {
+      final newPos = await NativePlayerService.playVideo(ep.videoUrl, ep.title, ep.watchProgress);
+      provider.updateEpisodeProgress(ep.id!, newPos);
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PlayerScreen(
+            videoUrl: ep.videoUrl,
+            title: ep.title,
+            initialPosition: Duration(milliseconds: ep.watchProgress),
+            onProgressUpdate: (pos) {
+              provider.updateEpisodeProgress(ep.id!, pos.inMilliseconds);
+            },
+          ),
+        ),
+      ).then((_) => _loadData());
+    }
   }
 
   @override
@@ -229,27 +268,21 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                            ? AppImage(path: ep.stillPath, width: 60, height: 40)
                            : const Icon(Icons.play_circle_outline),
                         title: Text('${ep.episodeNumber}. ${ep.title}'),
-                        subtitle: ep.videoUrl.isEmpty ? const Text('Sem URL - toque para editar', style: TextStyle(color: Colors.redAccent, fontSize: 12)) : null,
+                        subtitle: ep.videoUrl.isEmpty && ep.webPlayerUrl.isEmpty
+                           ? const Text('Sem URL - toque para editar', style: TextStyle(color: Colors.redAccent, fontSize: 12))
+                           : null,
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             if (ep.watchProgress > 0) const Icon(Icons.check_circle, color: Colors.green, size: 16),
                             IconButton(icon: const Icon(Icons.edit, size: 16), onPressed: () => _editEpisode(ep)),
+                            if (ep.webPlayerUrl.isNotEmpty)
+                               IconButton(icon: const Icon(Icons.language, size: 16), onPressed: () => _play(ep, true)),
                           ],
                         ),
-                        onTap: ep.videoUrl.isEmpty ? () => _editEpisode(ep) : () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => PlayerScreen(
-                              videoUrl: ep.videoUrl,
-                              title: ep.title,
-                              initialPosition: Duration(milliseconds: ep.watchProgress),
-                              onProgressUpdate: (pos) {
-                                context.read<MovieProvider>().updateEpisodeProgress(ep.id!, pos.inMilliseconds);
-                              },
-                            ),
-                          ),
-                        ).then((_) => _loadData()),
+                        onTap: (ep.videoUrl.isEmpty && ep.webPlayerUrl.isEmpty)
+                           ? () => _editEpisode(ep)
+                           : () => _play(ep, false),
                       )).toList(),
                       ListTile(
                         leading: const Icon(Icons.add),

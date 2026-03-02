@@ -5,6 +5,7 @@ class Movie {
   final String posterPath;
   final String backdropPath;
   final String videoUrl;
+  final String webPlayerUrl;
   final double voteAverage;
   final String releaseDate;
   final int watchProgress; // in milliseconds
@@ -17,6 +18,7 @@ class Movie {
     required this.posterPath,
     required this.backdropPath,
     required this.videoUrl,
+    this.webPlayerUrl = '',
     required this.voteAverage,
     required this.releaseDate,
     this.watchProgress = 0,
@@ -31,6 +33,7 @@ class Movie {
       'posterPath': posterPath,
       'backdropPath': backdropPath,
       'videoUrl': videoUrl,
+      'webPlayerUrl': webPlayerUrl,
       'voteAverage': voteAverage,
       'releaseDate': releaseDate,
       'watchProgress': watchProgress,
@@ -46,6 +49,7 @@ class Movie {
       posterPath: map['posterPath'],
       backdropPath: map['backdropPath'],
       videoUrl: map['videoUrl'],
+      webPlayerUrl: map['webPlayerUrl'] ?? '',
       voteAverage: map['voteAverage'],
       releaseDate: map['releaseDate'],
       watchProgress: map['watchProgress'] ?? 0,
@@ -146,6 +150,7 @@ class Episode {
   final String overview;
   final String stillPath;
   final String videoUrl;
+  final String webPlayerUrl;
   final int watchProgress;
   final int duration;
 
@@ -157,6 +162,7 @@ class Episode {
     required this.overview,
     required this.stillPath,
     required this.videoUrl,
+    this.webPlayerUrl = '',
     this.watchProgress = 0,
     this.duration = 0,
   });
@@ -170,6 +176,7 @@ class Episode {
       'overview': overview,
       'stillPath': stillPath,
       'videoUrl': videoUrl,
+      'webPlayerUrl': webPlayerUrl,
       'watchProgress': watchProgress,
       'duration': duration,
     };
@@ -184,6 +191,7 @@ class Episode {
       overview: map['overview'],
       stillPath: map['stillPath'],
       videoUrl: map['videoUrl'],
+      webPlayerUrl: map['webPlayerUrl'] ?? '',
       watchProgress: map['watchProgress'] ?? 0,
       duration: map['duration'] ?? 0,
     );

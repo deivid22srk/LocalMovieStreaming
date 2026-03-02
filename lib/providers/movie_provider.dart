@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/movie_models.dart';
 import '../services/database_service.dart';
 import '../services/api_service.dart';
@@ -13,14 +14,35 @@ class MovieProvider with ChangeNotifier {
   List<Movie> _movies = [];
   List<Series> _seriesList = [];
   String _apiKey = '';
+  bool _useNativePlayer = false;
 
   List<Movie> get movies => _movies;
   List<Series> get seriesList => _seriesList;
   String get apiKey => _apiKey;
+  bool get useNativePlayer => _useNativePlayer;
+
+  MovieProvider() {
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    _apiKey = prefs.getString('api_key') ?? '';
+    _useNativePlayer = prefs.getBool('use_native_player') ?? false;
+    _apiService.apiKey = _apiKey;
+    notifyListeners();
+  }
 
   set apiKey(String value) {
     _apiKey = value;
     _apiService.apiKey = value;
+    SharedPreferences.getInstance().then((prefs) => prefs.setString('api_key', value));
+    notifyListeners();
+  }
+
+  set useNativePlayer(bool value) {
+    _useNativePlayer = value;
+    SharedPreferences.getInstance().then((prefs) => prefs.setBool('use_native_player', value));
     notifyListeners();
   }
 
@@ -63,6 +85,7 @@ class MovieProvider with ChangeNotifier {
       posterPath: poster,
       backdropPath: backdrop,
       videoUrl: movie.videoUrl,
+      webPlayerUrl: movie.webPlayerUrl,
       voteAverage: movie.voteAverage,
       releaseDate: movie.releaseDate,
     );
@@ -82,6 +105,7 @@ class MovieProvider with ChangeNotifier {
       posterPath: poster,
       backdropPath: backdrop,
       videoUrl: movie.videoUrl,
+      webPlayerUrl: movie.webPlayerUrl,
       voteAverage: movie.voteAverage,
       releaseDate: movie.releaseDate,
       watchProgress: movie.watchProgress,
@@ -103,6 +127,7 @@ class MovieProvider with ChangeNotifier {
          posterPath: movie.posterPath,
          backdropPath: movie.backdropPath,
          videoUrl: movie.videoUrl,
+         webPlayerUrl: movie.webPlayerUrl,
          voteAverage: movie.voteAverage,
          releaseDate: movie.releaseDate,
          watchProgress: progress,
@@ -153,6 +178,7 @@ class MovieProvider with ChangeNotifier {
          overview: ep.overview,
          stillPath: ep.stillPath,
          videoUrl: ep.videoUrl,
+         webPlayerUrl: ep.webPlayerUrl,
          watchProgress: progress,
          duration: ep.duration,
        );
@@ -161,23 +187,9 @@ class MovieProvider with ChangeNotifier {
     }
   }
 
-  Future<void> updateEpisodeUrl(int episodeId, String url) async {
-    final ep = await _dbService.getEpisodeById(episodeId);
-    if (ep != null) {
-       final updatedEp = Episode(
-         id: ep.id,
-         seasonId: ep.seasonId,
-         episodeNumber: ep.episodeNumber,
-         title: ep.title,
-         overview: ep.overview,
-         stillPath: ep.stillPath,
-         videoUrl: url,
-         watchProgress: ep.watchProgress,
-         duration: ep.duration,
-       );
-       await _dbService.updateEpisode(updatedEp);
+  Future<void> updateEpisodeFull(Episode ep) async {
+       await _dbService.updateEpisode(ep);
        notifyListeners();
-    }
   }
 
   Future<void> addSeriesManual(Series series) async {

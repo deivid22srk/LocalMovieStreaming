@@ -4,6 +4,8 @@ import '../../providers/movie_provider.dart';
 import '../../models/movie_models.dart';
 import '../widgets/app_image.dart';
 import 'player_screen.dart';
+import 'web_player_screen.dart';
+import '../../services/native_player_service.dart';
 
 class MovieDetailsScreen extends StatelessWidget {
   final Movie movie;
@@ -63,22 +65,23 @@ class MovieDetailsScreen extends StatelessWidget {
                       foregroundColor: Colors.black,
                       minimumSize: const Size(double.infinity, 50),
                     ),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => PlayerScreen(
-                          videoUrl: movie.videoUrl,
-                          title: movie.title,
-                          initialPosition: Duration(milliseconds: movie.watchProgress),
-                          onProgressUpdate: (pos) {
-                            context.read<MovieProvider>().updateMovieProgress(movie.id!, pos.inMilliseconds);
-                          },
-                        ),
-                      ),
-                    ),
+                    onPressed: () => _play(context, false),
                     icon: const Icon(Icons.play_arrow),
                     label: const Text('ASSISTIR'),
                   ),
+                  if (movie.webPlayerUrl.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 50),
+                        side: const BorderSide(color: Colors.white),
+                      ),
+                      onPressed: () => _play(context, true),
+                      icon: const Icon(Icons.language),
+                      label: const Text('ASSISTIR (WEB PLAYER)'),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   const Text('Sinopse', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 10),
@@ -90,5 +93,36 @@ class MovieDetailsScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _play(BuildContext context, bool useWeb) async {
+    final provider = context.read<MovieProvider>();
+
+    if (useWeb) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => WebPlayerScreen(url: movie.webPlayerUrl, title: movie.title)),
+      );
+      return;
+    }
+
+    if (provider.useNativePlayer) {
+      final newPos = await NativePlayerService.playVideo(movie.videoUrl, movie.title, movie.watchProgress);
+      provider.updateMovieProgress(movie.id!, newPos);
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PlayerScreen(
+            videoUrl: movie.videoUrl,
+            title: movie.title,
+            initialPosition: Duration(milliseconds: movie.watchProgress),
+            onProgressUpdate: (pos) {
+              provider.updateMovieProgress(movie.id!, pos.inMilliseconds);
+            },
+          ),
+        ),
+      );
+    }
   }
 }
