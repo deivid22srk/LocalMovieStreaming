@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:media_kit/media_kit.dart';
 import 'providers/movie_provider.dart';
 import 'ui/screens/home_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
   runApp(
     MultiProvider(
       providers: [
@@ -20,12 +23,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'LocalMovieStreaming',
+      title: 'Local Movie Player',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF000010), // Very dark blue, almost black
-        primaryColor: const Color(0xFF7E3FF2), // Purple accent
+        scaffoldBackgroundColor: const Color(0xFF000010),
+        primaryColor: const Color(0xFF7E3FF2),
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.transparent,
           elevation: 0,

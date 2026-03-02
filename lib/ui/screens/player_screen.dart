@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
-import 'package:chewie/chewie.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:flutter/services.dart';
 import 'package:pip_view/pip_view.dart';
 
@@ -24,10 +24,11 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  VideoPlayerController? _videoPlayerController;
-  ChewieController? _chewieController;
+  late final Player player = Player();
+  late final VideoController controller = VideoController(player);
   bool _hasError = false;
   String _errorMsg = '';
+  bool _isInitialized = false;
 
   @override
   void initState() {
@@ -43,35 +44,30 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   Future<void> _initializePlayer() async {
     try {
-      _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
+      player.stream.error.listen((event) {
+        if (mounted) {
+          setState(() {
+            _hasError = true;
+            _errorMsg = event; // event is String in media_kit
+          });
+        }
+      });
 
-      await _videoPlayerController!.initialize();
+      player.stream.completed.listen((completed) {
+        if (completed && mounted) {
+           Navigator.pop(context);
+        }
+      });
 
-      _chewieController = ChewieController(
-        videoPlayerController: _videoPlayerController!,
-        autoPlay: true,
-        looping: false,
-        startAt: widget.initialPosition,
-        aspectRatio: _videoPlayerController!.value.aspectRatio,
-        showControls: true,
-        materialProgressColors: ChewieProgressColors(
-          playedColor: Colors.purple,
-          handleColor: Colors.purpleAccent,
-          backgroundColor: Colors.white24,
-          bufferedColor: Colors.white54,
-        ),
-        placeholder: Container(color: Colors.black),
-        autoInitialize: true,
-        errorBuilder: (context, errorMessage) {
-          return Center(
-            child: Text(
-              errorMessage,
-              style: const TextStyle(color: Colors.white),
-            ),
-          );
-        },
-      );
-      setState(() {});
+      await player.open(Media(widget.videoUrl), play: true);
+
+      if (widget.initialPosition > Duration.zero) {
+        await player.seek(widget.initialPosition);
+      }
+
+      setState(() {
+        _isInitialized = true;
+      });
     } catch (e) {
       setState(() {
         _hasError = true;
@@ -82,11 +78,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   void dispose() {
-    if (_videoPlayerController != null) {
-       widget.onProgressUpdate(_videoPlayerController!.value.position);
-    }
-    _videoPlayerController?.dispose();
-    _chewieController?.dispose();
+    widget.onProgressUpdate(player.state.position);
+    player.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -131,8 +124,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
       );
     }
 
-    if (_chewieController != null && _chewieController!.videoPlayerController.value.isInitialized) {
-       return Chewie(controller: _chewieController!);
+    if (_isInitialized) {
+       return Video(
+         controller: controller,
+         fill: Colors.black,
+       );
     }
 
     return const Center(
@@ -141,7 +137,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         children: [
           CircularProgressIndicator(color: Colors.purple),
           SizedBox(height: 10),
-          Text('Carregando...', style: TextStyle(color: Colors.white, fontSize: 12)),
+          Text('Carregando com MediaKit...', style: TextStyle(color: Colors.white, fontSize: 12)),
         ],
       ),
     );
