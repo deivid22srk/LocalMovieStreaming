@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
@@ -21,6 +22,7 @@ import kotlin.concurrent.schedule
 
 class VlcPlayerActivity : AppCompatActivity() {
 
+    private val TAG = "VlcPlayerActivity"
     private var libVLC: LibVLC? = null
     private var mediaPlayer: MediaPlayer? = null
     private var videoLayout: VLCVideoLayout? = null
@@ -65,19 +67,24 @@ class VlcPlayerActivity : AppCompatActivity() {
         args.add("--http-reconnect")
         args.add("--network-caching=2000")
 
-        libVLC = LibVLC(this, args)
-        mediaPlayer = MediaPlayer(libVLC)
-        mediaPlayer?.attachViews(videoLayout!!, null, true, false)
+        try {
+            libVLC = LibVLC(this, args)
+            mediaPlayer = MediaPlayer(libVLC)
+            mediaPlayer?.attachViews(videoLayout!!, null, true, false)
 
-        if (videoUrl != null) {
-            val media = Media(libVLC, Uri.parse(videoUrl))
-            mediaPlayer?.media = media
-            media.release()
-        }
+            if (videoUrl != null) {
+                Log.d(TAG, "Loading URL: $videoUrl")
+                val media = Media(libVLC, Uri.parse(videoUrl))
+                mediaPlayer?.media = media
+                media.release()
+            }
 
-        mediaPlayer?.play()
-        if (initialPosition > 0) {
-            mediaPlayer?.time = initialPosition
+            mediaPlayer?.play()
+            if (initialPosition > 0) {
+                mediaPlayer?.time = initialPosition
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initializing VLC", e)
         }
 
         setupListeners()
@@ -125,6 +132,9 @@ class VlcPlayerActivity : AppCompatActivity() {
                     runOnUiThread {
                         loadingProgress.visibility = if (event.buffering < 100f) View.VISIBLE else View.GONE
                     }
+                }
+                MediaPlayer.Event.EncounteredError -> {
+                    Log.e(TAG, "VLC Player encountered error")
                 }
             }
         }
