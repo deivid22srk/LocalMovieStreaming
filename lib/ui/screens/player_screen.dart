@@ -38,10 +38,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
       autoPlay: true,
       options: VlcPlayerOptions(
          advanced: VlcAdvancedOptions([
-           VlcAdvancedOptions.networkCaching(3000), // Increase caching for stability
+           VlcAdvancedOptions.networkCaching(1500),
+           '--file-caching=1500',
+           '--live-caching=1500',
+           '--clock-jitter=0',
+           '--clock-synchro=0',
+           '--no-stats',
+           '--no-video-title-show',
+           '--rtsp-tcp', // Manually add rtsp-tcp as it might be safer
          ]),
          http: VlcHttpOptions([
            VlcHttpOptions.httpReconnect(true),
+           '--http-continuous',
          ]),
       ),
     );
@@ -124,7 +132,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   child: VlcPlayer(
                     controller: _vlcViewController,
                     aspectRatio: _aspectRatio,
-                    placeholder: const Center(child: CircularProgressIndicator(color: Colors.purple)),
+                    placeholder: const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(color: Colors.purple),
+                          SizedBox(height: 10),
+                          Text('Carregando Stream...', style: TextStyle(color: Colors.white, fontSize: 12)),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
                 if (_showControls && !isFloating)
@@ -133,16 +150,28 @@ class _PlayerScreenState extends State<PlayerScreen> {
                    Center(
                      child: Container(
                        padding: const EdgeInsets.all(20),
-                       color: Colors.black87,
+                       margin: const EdgeInsets.all(20),
+                       decoration: BoxDecoration(
+                         color: Colors.black87,
+                         borderRadius: BorderRadius.circular(10),
+                         border: Border.all(color: Colors.redAccent),
+                       ),
                        child: Column(
                          mainAxisSize: MainAxisSize.min,
                          children: [
                            const Icon(Icons.error_outline, color: Colors.red, size: 60),
                            const SizedBox(height: 10),
-                           Text('Erro VLC: ${_vlcViewController.value.errorDescription}',
+                           const Text('ERRO NO PLAYER VLC', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                           const SizedBox(height: 5),
+                           Text('${_vlcViewController.value.errorDescription}',
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(color: Colors.white)),
-                           TextButton(onPressed: () => Navigator.pop(context), child: const Text('VOLTAR'))
+                                style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                           const SizedBox(height: 20),
+                           ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.white12),
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('VOLTAR', style: TextStyle(color: Colors.white)),
+                           )
                          ],
                        ),
                      ),
