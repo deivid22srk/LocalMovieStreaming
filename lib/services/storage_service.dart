@@ -4,15 +4,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import 'package:file_picker/file_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:share_plus/share_plus.dart';
 
 class StorageService {
   Future<String?> exportData() async {
-    // Check for storage permissions (Android 10+)
-    if (Platform.isAndroid) {
-       await Permission.manageExternalStorage.request();
-    }
-
     final dbPath = p.join(await getDatabasesPath(), 'movie_streaming.db');
     final dbFile = File(dbPath);
 
@@ -42,24 +37,20 @@ class StorageService {
 
     if (zipData == null) return 'Zip encoding failed';
 
-    // Instead of using saveFile (which might fail on some Android versions),
-    // let's try getting a directory and writing it there manually or using share_plus in future
-    // For now, let's keep saveFile but handle null and potential errors.
     try {
-      String? outputPath = await FilePicker.platform.getDirectoryPath(
-        dialogTitle: 'Selecione a pasta para salvar o backup',
-      );
+      final tempDir = await getTemporaryDirectory();
+      final zipPath = p.join(tempDir.path, 'local_movie_backup.zip');
+      final zipFile = File(zipPath);
+      await zipFile.writeAsBytes(zipData);
 
-      if (outputPath != null) {
-        final finalPath = p.join(outputPath, 'local_movie_backup_${DateTime.now().millisecondsSinceEpoch}.zip');
-        final outputFile = File(finalPath);
-        await outputFile.writeAsBytes(zipData);
-        return finalPath;
-      }
+      // Using Share is much more reliable on modern Android than direct path writing
+      // and it allows the user to save to Google Drive, Telegram, or any SAF folder.
+      await Share.shareXFiles([XFile(zipPath)], text: 'Backup Local Movie Player');
+
+      return 'Compartilhado com sucesso';
     } catch (e) {
        return 'Error during export: $e';
     }
-    return null;
   }
 
   Future<bool> importData() async {

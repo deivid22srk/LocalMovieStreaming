@@ -38,7 +38,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       autoPlay: true,
       options: VlcPlayerOptions(
          advanced: VlcAdvancedOptions([
-           VlcAdvancedOptions.networkCaching(2000),
+           VlcAdvancedOptions.networkCaching(3000), // Increase caching for stability
+         ]),
+         http: VlcHttpOptions([
+           VlcHttpOptions.httpReconnect(true),
          ]),
       ),
     );
@@ -121,13 +124,29 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   child: VlcPlayer(
                     controller: _vlcViewController,
                     aspectRatio: _aspectRatio,
-                    placeholder: const Center(child: CircularProgressIndicator()),
+                    placeholder: const Center(child: CircularProgressIndicator(color: Colors.purple)),
                   ),
                 ),
                 if (_showControls && !isFloating)
                   _buildControlsOverlay(),
                 if (_vlcViewController.value.hasError)
-                   Center(child: Text('Erro ao carregar vídeo: ${_vlcViewController.value.errorDescription}', style: const TextStyle(color: Colors.red))),
+                   Center(
+                     child: Container(
+                       padding: const EdgeInsets.all(20),
+                       color: Colors.black87,
+                       child: Column(
+                         mainAxisSize: MainAxisSize.min,
+                         children: [
+                           const Icon(Icons.error_outline, color: Colors.red, size: 60),
+                           const SizedBox(height: 10),
+                           Text('Erro VLC: ${_vlcViewController.value.errorDescription}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.white)),
+                           TextButton(onPressed: () => Navigator.pop(context), child: const Text('VOLTAR'))
+                         ],
+                       ),
+                     ),
+                   ),
               ],
             ),
           ),
@@ -199,12 +218,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     IconButton(
                       icon: const Icon(Icons.picture_in_picture, color: Colors.white),
                       onPressed: () {
-                        PIPView.of(context)!.presentBelow(Container());
+                        PIPView.of(context)!.presentBelow(const SizedBox.shrink());
                       },
                     ),
                     Text(
                       '${_formatDuration(position)} / ${_formatDuration(duration)}',
-                      style: const TextStyle(color: Colors.white),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
