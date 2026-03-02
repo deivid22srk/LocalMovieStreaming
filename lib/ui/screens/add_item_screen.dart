@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../providers/movie_provider.dart';
 import '../../models/movie_models.dart';
+import '../widgets/app_image.dart';
 
 class AddItemScreen extends StatefulWidget {
   const AddItemScreen({super.key});
@@ -11,12 +12,29 @@ class AddItemScreen extends StatefulWidget {
   State<AddItemScreen> createState() => _AddItemScreenState();
 }
 
-class _AddItemScreenState extends State<AddItemScreen> {
+class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _urlController = TextEditingController();
+
+  // Manual form controllers
+  final TextEditingController _titleCtrl = TextEditingController();
+  final TextEditingController _overviewCtrl = TextEditingController();
+  final TextEditingController _posterCtrl = TextEditingController();
+  final TextEditingController _backdropCtrl = TextEditingController();
+  final TextEditingController _manualUrlCtrl = TextEditingController();
+  final TextEditingController _dateCtrl = TextEditingController();
+
   List<dynamic> _searchResults = [];
   bool _isLoading = false;
   bool _isSearchingSeries = false;
+  bool _manualIsSeries = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
 
   void _search() async {
     setState(() => _isLoading = true);
@@ -33,6 +51,44 @@ class _AddItemScreenState extends State<AddItemScreen> {
       );
     }
     setState(() => _isLoading = false);
+  }
+
+  Future<void> _pickImage(TextEditingController controller) async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
+    if (result != null && result.files.single.path != null) {
+      controller.text = result.files.single.path!;
+    }
+  }
+
+  void _addManual() async {
+    if (_titleCtrl.text.isEmpty) return;
+
+    final provider = context.read<MovieProvider>();
+    setState(() => _isLoading = true);
+
+    if (_manualIsSeries) {
+      await provider.addSeriesManual(Series(
+        title: _titleCtrl.text,
+        overview: _overviewCtrl.text,
+        posterPath: _posterCtrl.text,
+        backdropPath: _backdropCtrl.text,
+        voteAverage: 0.0,
+        firstAirDate: _dateCtrl.text,
+      ));
+    } else {
+      await provider.addMovie(Movie(
+        title: _titleCtrl.text,
+        overview: _overviewCtrl.text,
+        posterPath: _posterCtrl.text,
+        backdropPath: _backdropCtrl.text,
+        videoUrl: _manualUrlCtrl.text,
+        voteAverage: 0.0,
+        releaseDate: _dateCtrl.text,
+      ));
+    }
+
+    setState(() => _isLoading = false);
+    if (mounted) Navigator.pop(context);
   }
 
   void _showAddDialog(dynamic item) {
@@ -89,70 +145,128 @@ class _AddItemScreenState extends State<AddItemScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Adicionar Filme/Série'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Buscar na API TMDB...',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(30)),
-                      suffixIcon: IconButton(icon: const Icon(Icons.search), onPressed: _search),
-                    ),
-                    onSubmitted: (_) => _search(),
-                  ),
-                ),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('Filmes'),
-                Switch(
-                  value: _isSearchingSeries,
-                  onChanged: (v) => setState(() => _isSearchingSeries = v),
-                ),
-                const Text('Séries'),
-              ],
-            ),
-            const SizedBox(height: 20),
-            if (_isLoading)
-              const CircularProgressIndicator()
-            else
-              Expanded(
-                child: ListView.builder(
-                  itemCount: _searchResults.length,
-                  itemBuilder: (context, index) {
-                    final item = _searchResults[index];
-                    final String title = item is Movie ? item.title : item['name'];
-                    final String posterPath = item is Movie
-                        ? item.posterPath
-                        : (item['poster_path'] != null ? 'https://image.tmdb.org/t/p/w500${item['poster_path']}' : '');
-                    final String sub = item is Movie ? item.releaseDate : (item['first_air_date'] ?? '');
-
-                    return ListTile(
-                      leading: CachedNetworkImage(
-                        imageUrl: posterPath,
-                        width: 50,
-                        placeholder: (context, url) => Container(color: Colors.grey),
-                        errorWidget: (context, url, error) => const Icon(Icons.movie),
-                      ),
-                      title: Text(title),
-                      subtitle: Text(sub),
-                      onTap: () => _showAddDialog(item),
-                    );
-                  },
-                ),
-              ),
+        title: const Text('Adicionar Novo'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'BUSCAR API'),
+            Tab(text: 'MANUAL'),
           ],
         ),
       ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildApiSearchTab(),
+          _buildManualTab(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildApiSearchTab() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Buscar no TMDB...',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(30)),
+              suffixIcon: IconButton(icon: const Icon(Icons.search), onPressed: _search),
+            ),
+            onSubmitted: (_) => _search(),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('Filmes'),
+              Switch(
+                value: _isSearchingSeries,
+                onChanged: (v) => setState(() => _isSearchingSeries = v),
+              ),
+              const Text('Séries'),
+            ],
+          ),
+          const SizedBox(height: 20),
+          if (_isLoading)
+            const CircularProgressIndicator()
+          else
+            Expanded(
+              child: ListView.builder(
+                itemCount: _searchResults.length,
+                itemBuilder: (context, index) {
+                  final item = _searchResults[index];
+                  final String title = item is Movie ? item.title : item['name'];
+                  final String posterPath = item is Movie
+                      ? item.posterPath
+                      : (item['poster_path'] != null ? 'https://image.tmdb.org/t/p/w500${item['poster_path']}' : '');
+
+                  return ListTile(
+                    leading: AppImage(path: posterPath, width: 50),
+                    title: Text(title),
+                    onTap: () => _showAddDialog(item),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildManualTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('Filme'),
+              Switch(
+                value: _manualIsSeries,
+                onChanged: (v) => setState(() => _manualIsSeries = v),
+              ),
+              const Text('Série'),
+            ],
+          ),
+          TextField(controller: _titleCtrl, decoration: const InputDecoration(labelText: 'Título')),
+          TextField(controller: _overviewCtrl, decoration: const InputDecoration(labelText: 'Sinopse'), maxLines: 3),
+          TextField(controller: _dateCtrl, decoration: const InputDecoration(labelText: 'Data de Lançamento (Ex: 2024-01-01)')),
+          if (!_manualIsSeries)
+            TextField(controller: _manualUrlCtrl, decoration: const InputDecoration(labelText: 'URL do Vídeo')),
+          const SizedBox(height: 20),
+          _buildImagePickerRow('Capa (Poster)', _posterCtrl),
+          const SizedBox(height: 10),
+          _buildImagePickerRow('Banner (Backdrop)', _backdropCtrl),
+          const SizedBox(height: 30),
+          if (_isLoading)
+            const CircularProgressIndicator()
+          else
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+              onPressed: _addManual,
+              child: const Text('SALVAR MANUALMENTE'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImagePickerRow(String label, TextEditingController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+        Row(
+          children: [
+            Expanded(child: TextField(controller: controller, decoration: const InputDecoration(hintText: 'Link ou caminho do arquivo'))),
+            IconButton(icon: const Icon(Icons.file_open), onPressed: () => _pickImage(controller)),
+          ],
+        ),
+      ],
     );
   }
 }

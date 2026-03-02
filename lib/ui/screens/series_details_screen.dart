@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../models/movie_models.dart';
 import '../../services/database_service.dart';
 import '../../providers/movie_provider.dart';
+import '../widgets/app_image.dart';
 import 'player_screen.dart';
 
 class SeriesDetailsScreen extends StatefulWidget {
@@ -41,24 +42,117 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
     }
   }
 
-  void _editEpisode(Episode ep) {
-    final TextEditingController urlCtrl = TextEditingController(text: ep.videoUrl);
+  void _addSeason() async {
+    final num = _seasons.length + 1;
+    await _dbService.insertSeason(Season(
+      seriesId: widget.series.id!,
+      seasonNumber: num,
+      title: 'Temporada $num',
+      overview: '',
+      posterPath: widget.series.posterPath,
+    ));
+    _loadData();
+  }
+
+  void _addEpisode(Season season) {
+    final TextEditingController urlCtrl = TextEditingController();
+    final TextEditingController titleCtrl = TextEditingController();
+    final TextEditingController imageCtrl = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Editar Episódio ${ep.episodeNumber}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: urlCtrl, decoration: const InputDecoration(labelText: 'URL do Vídeo')),
-          ],
+        title: Text('Novo Episódio - ${season.title}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Título')),
+              TextField(controller: urlCtrl, decoration: const InputDecoration(labelText: 'URL do Vídeo')),
+              Row(
+                children: [
+                  Expanded(child: TextField(controller: imageCtrl, decoration: const InputDecoration(labelText: 'Imagem do Episódio (Opcional)'))),
+                  IconButton(
+                    icon: const Icon(Icons.file_open),
+                    onPressed: () async {
+                      FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
+                      if (result != null) imageCtrl.text = result.files.single.path!;
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
           TextButton(
             onPressed: () async {
-               await context.read<MovieProvider>().updateEpisodeUrl(ep.id!, urlCtrl.text);
+               final num = (_episodes[season.id!]?.length ?? 0) + 1;
+               await _dbService.insertEpisode(Episode(
+                 seasonId: season.id!,
+                 episodeNumber: num,
+                 title: titleCtrl.text.isNotEmpty ? titleCtrl.text : 'Episódio $num',
+                 overview: '',
+                 stillPath: imageCtrl.text,
+                 videoUrl: urlCtrl.text,
+               ));
+               Navigator.pop(context);
+               _loadData();
+            },
+            child: const Text('Adicionar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editEpisode(Episode ep) {
+    final TextEditingController urlCtrl = TextEditingController(text: ep.videoUrl);
+    final TextEditingController titleCtrl = TextEditingController(text: ep.title);
+    final TextEditingController imageCtrl = TextEditingController(text: ep.stillPath);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Editar Episódio ${ep.episodeNumber}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Título')),
+              TextField(controller: urlCtrl, decoration: const InputDecoration(labelText: 'URL do Vídeo')),
+              Row(
+                children: [
+                  Expanded(child: TextField(controller: imageCtrl, decoration: const InputDecoration(labelText: 'Imagem'))),
+                  IconButton(
+                    icon: const Icon(Icons.file_open),
+                    onPressed: () async {
+                      FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
+                      if (result != null) imageCtrl.text = result.files.single.path!;
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () async {
+               final updatedEp = Episode(
+                 id: ep.id,
+                 seasonId: ep.seasonId,
+                 episodeNumber: ep.episodeNumber,
+                 title: titleCtrl.text,
+                 overview: ep.overview,
+                 stillPath: imageCtrl.text,
+                 videoUrl: urlCtrl.text,
+                 watchProgress: ep.watchProgress,
+                 duration: ep.duration,
+               );
+               await _dbService.updateEpisode(updatedEp);
                Navigator.pop(context);
                _loadData();
             },
@@ -82,11 +176,10 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
           children: [
              Stack(
               children: [
-                CachedNetworkImage(
-                  imageUrl: widget.series.backdropPath.isNotEmpty ? widget.series.backdropPath : widget.series.posterPath,
+                AppImage(
+                  path: widget.series.backdropPath.isNotEmpty ? widget.series.backdropPath : widget.series.posterPath,
                   height: 300,
                   width: double.infinity,
-                  fit: BoxFit.cover,
                 ),
                 Container(
                   height: 300,
@@ -120,13 +213,21 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                   const SizedBox(height: 20),
                   Text(widget.series.overview, style: const TextStyle(fontSize: 16, height: 1.5, color: Colors.white70)),
                   const SizedBox(height: 30),
-                  const Text('Temporadas', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Temporadas', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: _addSeason),
+                    ],
+                  ),
                   const Divider(),
                   ..._seasons.map((season) => ExpansionTile(
                     title: Text(season.title),
                     children: [
                       ...?_episodes[season.id!]?.map((ep) => ListTile(
-                        leading: const Icon(Icons.play_circle_outline),
+                        leading: ep.stillPath.isNotEmpty
+                           ? AppImage(path: ep.stillPath, width: 60, height: 40)
+                           : const Icon(Icons.play_circle_outline),
                         title: Text('${ep.episodeNumber}. ${ep.title}'),
                         subtitle: ep.videoUrl.isEmpty ? const Text('Sem URL - toque para editar', style: TextStyle(color: Colors.redAccent, fontSize: 12)) : null,
                         trailing: Row(
@@ -150,6 +251,11 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                           ),
                         ).then((_) => _loadData()),
                       )).toList(),
+                      ListTile(
+                        leading: const Icon(Icons.add),
+                        title: const Text('Adicionar Episódio'),
+                        onTap: () => _addEpisode(season),
+                      ),
                     ],
                   )).toList(),
                 ],

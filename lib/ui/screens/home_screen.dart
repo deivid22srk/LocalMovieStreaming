@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/movie_provider.dart';
 import '../../models/movie_models.dart';
+import '../widgets/app_image.dart';
 import 'add_item_screen.dart';
 import 'movie_details_screen.dart';
 import 'series_details_screen.dart';
@@ -30,7 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('LocalMovieStreaming', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Local Movie Player', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
            IconButton(
             icon: const Icon(Icons.settings),
@@ -123,10 +123,8 @@ class _HeroBanner extends StatelessWidget {
               stops: [0.6, 1.0],
             ),
           ),
-          child: CachedNetworkImage(
-            imageUrl: featured.backdropPath.isNotEmpty ? featured.backdropPath : featured.posterPath,
-            fit: BoxFit.cover,
-            errorWidget: (context, url, error) => const Icon(Icons.error),
+          child: AppImage(
+            path: featured.backdropPath.isNotEmpty ? featured.backdropPath : featured.posterPath,
           ),
         ),
         Positioned(
@@ -203,12 +201,7 @@ class _MovieSection extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(horizontal: 10),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: CachedNetworkImage(
-                      imageUrl: movie.posterPath,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(color: Colors.grey.shade900),
-                      errorWidget: (context, url, error) => Container(color: Colors.grey.shade900, child: const Icon(Icons.movie)),
-                    ),
+                    child: AppImage(path: movie.posterPath),
                   ),
                 ),
               );
@@ -255,12 +248,7 @@ class _SeriesSection extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(horizontal: 10),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: CachedNetworkImage(
-                      imageUrl: series.posterPath,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(color: Colors.grey.shade900),
-                      errorWidget: (context, url, error) => Container(color: Colors.grey.shade900, child: const Icon(Icons.tv)),
-                    ),
+                    child: AppImage(path: series.posterPath),
                   ),
                 ),
               );

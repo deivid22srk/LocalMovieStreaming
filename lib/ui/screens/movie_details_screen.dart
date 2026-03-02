@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
-import '../../models/movie_models.dart';
 import '../../providers/movie_provider.dart';
+import '../../models/movie_models.dart';
+import '../widgets/app_image.dart';
 import 'player_screen.dart';
 
 class MovieDetailsScreen extends StatelessWidget {
@@ -20,11 +20,10 @@ class MovieDetailsScreen extends StatelessWidget {
           children: [
             Stack(
               children: [
-                CachedNetworkImage(
-                  imageUrl: movie.backdropPath.isNotEmpty ? movie.backdropPath : movie.posterPath,
+                AppImage(
+                  path: movie.backdropPath.isNotEmpty ? movie.backdropPath : movie.posterPath,
                   height: 300,
                   width: double.infinity,
-                  fit: BoxFit.cover,
                 ),
                 Container(
                   height: 300,
@@ -54,7 +53,7 @@ class MovieDetailsScreen extends StatelessWidget {
                       const SizedBox(width: 5),
                       Text('${movie.voteAverage.toStringAsFixed(1)} / 10'),
                       const SizedBox(width: 20),
-                      Text(movie.releaseDate.split('-')[0]),
+                      Text(movie.releaseDate.isNotEmpty ? movie.releaseDate.split('-')[0] : 'N/A'),
                     ],
                   ),
                   const SizedBox(height: 20),

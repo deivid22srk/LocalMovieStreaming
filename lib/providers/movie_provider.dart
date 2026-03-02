@@ -1,4 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import '../models/movie_models.dart';
 import '../services/database_service.dart';
 import '../services/api_service.dart';
@@ -31,13 +34,40 @@ class MovieProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> addMovie(Movie movie) async {
-    await _dbService.insertMovie(movie);
-    await fetchMovies();
+  Future<String> _saveLocalImage(String path) async {
+    if (path.isEmpty || path.startsWith('http')) return path;
+
+    final file = File(path);
+    if (!file.existsSync()) return '';
+
+    final appDir = await getApplicationDocumentsDirectory();
+    final fileName = p.basename(path);
+    final savedPath = p.join(appDir.path, 'images', fileName);
+
+    final savedFile = File(savedPath);
+    if (!savedFile.parent.existsSync()) {
+      savedFile.parent.createSync(recursive: true);
+    }
+
+    await file.copy(savedPath);
+    return savedPath;
   }
 
-  Future<void> updateMovie(Movie movie) async {
-    await _dbService.updateMovie(movie);
+  Future<void> addMovie(Movie movie) async {
+    final poster = await _saveLocalImage(movie.posterPath);
+    final backdrop = await _saveLocalImage(movie.backdropPath);
+
+    final finalMovie = Movie(
+      title: movie.title,
+      overview: movie.overview,
+      posterPath: poster,
+      backdropPath: backdrop,
+      videoUrl: movie.videoUrl,
+      voteAverage: movie.voteAverage,
+      releaseDate: movie.releaseDate,
+    );
+
+    await _dbService.insertMovie(finalMovie);
     await fetchMovies();
   }
 
@@ -101,6 +131,23 @@ class MovieProvider with ChangeNotifier {
     }
   }
 
+  Future<void> addSeriesManual(Series series) async {
+    final poster = await _saveLocalImage(series.posterPath);
+    final backdrop = await _saveLocalImage(series.backdropPath);
+
+    final finalSeries = Series(
+      title: series.title,
+      overview: series.overview,
+      posterPath: poster,
+      backdropPath: backdrop,
+      voteAverage: series.voteAverage,
+      firstAirDate: series.firstAirDate,
+    );
+
+    await _dbService.insertSeries(finalSeries);
+    await fetchSeriesList();
+  }
+
   Future<void> addSeriesWithMetadata(Map<String, dynamic> seriesData) async {
     final series = Series(
       title: seriesData['name'] ?? '',
@@ -116,7 +163,7 @@ class MovieProvider with ChangeNotifier {
 
     final seasons = await _apiService.getSeasons(tmdbId, seriesId);
     for (var season in seasons) {
-      if (season.seasonNumber == 0) continue; // Skip specials for now
+      if (season.seasonNumber == 0) continue;
       int seasonId = await _dbService.insertSeason(season);
       final episodes = await _apiService.getEpisodes(tmdbId, season.seasonNumber, seasonId);
       for (var ep in episodes) {

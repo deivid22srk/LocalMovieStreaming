@@ -20,8 +20,8 @@ void main() {
       ),
     );
 
-    // Verify that the app title is present
-    expect(find.text('LocalMovieStreaming'), findsOneWidget);
+    // Verify that the app title is present (we changed it to Local Movie Player)
+    expect(find.text('Local Movie Player'), findsOneWidget);
 
     // Verify that the empty state message is present since we have no movies
     expect(find.text('Nenhum conteúdo adicionado'), findsOneWidget);
