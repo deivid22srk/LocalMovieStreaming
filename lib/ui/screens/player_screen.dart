@@ -45,7 +45,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
            '--clock-synchro=0',
            '--no-stats',
            '--no-video-title-show',
-           '--rtsp-tcp', // Manually add rtsp-tcp as it might be safer
+           '--rtsp-tcp',
          ]),
          http: VlcHttpOptions([
            VlcHttpOptions.httpReconnect(true),
@@ -67,7 +67,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _onVlcChange() {
     if (_vlcViewController.value.isInitialized && !_hasSeeked && widget.initialPosition > Duration.zero) {
       _hasSeeked = true;
-      _vlcViewController.setTime(widget.initialPosition.inMilliseconds);
+      // Use a small delay to ensure player is ready to seek
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) _vlcViewController.setTime(widget.initialPosition.inMilliseconds);
+      });
     }
     if (mounted) setState(() {});
   }
