@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
-import 'package:telegram_client/telegram_client.dart';
-import 'package:telegram_client/scheme/telegram_client_library_tdlib_option_parameter.dart';
+import 'package:tg/tg.dart' as tg;
+import 'package:t/t.dart' as t;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
@@ -80,13 +81,11 @@ class TelegramService {
   static HttpServer? _server;
   static const int proxyPort = 8080;
 
-  static TelegramClient? _client;
-
-  static StreamController<String>? _authStateController;
-  static Stream<String>? get authStateStream => _authStateController?.stream;
-
-  static TelegramClientData? _tgData;
-  static Completer<void>? _initCompleter;
+  static tg.Client? _client;
+  static t.AuthSentCode? _sentCode;
+  static String? _phone;
+  static int? _apiId;
+  static String? _apiHash;
 
   static Future<void> initClient({
     required String apiId,
@@ -94,81 +93,89 @@ class TelegramService {
     required String dbPath,
   }) async {
     if (_client != null) return;
-    _client = TelegramClient();
-    _authStateController = StreamController<String>.broadcast();
-    _initCompleter = Completer<void>();
+    _apiId = int.tryParse(apiId);
+    _apiHash = apiHash;
 
-    _client!.on(
-      event_name: _client!.event_update,
-      onUpdate: (UpdateTelegramClient update) async {
-        _tgData = update.telegramClientData;
-        if (_initCompleter != null && !_initCompleter!.isCompleted) {
-          _initCompleter!.complete();
-        }
-
-        final raw = update.rawData;
-        if (raw["@type"] == "updateAuthorizationState") {
-          final state = raw["authorization_state"]["@type"];
-          _authStateController?.add(state);
-          print("Telegram Auth State: $state");
-        }
-      },
-      onError: (error, stackTrace) {
-        print("Telegram Error: $error");
-      },
+    const dc = t.DcOption(
+      ipv6: false,
+      mediaOnly: false,
+      tcpoOnly: false,
+      cdn: false,
+      static: false,
+      thisPortOnly: false,
+      id: 1,
+      ipAddress: '149.154.167.50',
+      port: 443,
     );
 
-    final appDir = await getApplicationDocumentsDirectory();
-    final tgDir = Directory(p.join(appDir.path, dbPath));
-    if (!tgDir.existsSync()) tgDir.createSync(recursive: true);
+    final socket = await Socket.connect(dc.ipAddress, dc.port);
+    final tgSocket = _IoSocket(socket);
+    final obfuscation = tg.Obfuscation.random(false, dc.id);
+    final idGenerator = tg.MessageIdGenerator();
 
-    _client!.ensureInitialized(
-       telegramClientTdlibOption: TelegramClientTdlibOption(
-         clientOption: TelegramClientLibraryTdlibOptionParameter.create(
-           database_directory: tgDir.path,
-           files_directory: tgDir.path,
-           api_id: int.tryParse(apiId) ?? 0,
-           api_hash: apiHash,
-         ),
-       ),
+    await tgSocket.send(obfuscation.preamble);
+
+    final authKey = await tg.Client.authorize(
+      tgSocket,
+      obfuscation,
+      idGenerator,
     );
 
-    await _client!.tdlib.createclient(clientId: _client!.tdlib.td_create_client_id());
+    _client = tg.Client(
+      socket: tgSocket,
+      obfuscation: obfuscation,
+      authorizationKey: authKey,
+      idGenerator: idGenerator,
+    );
 
-    // Wait for the first update to populate _tgData
-    try {
-      await _initCompleter!.future.timeout(const Duration(seconds: 15));
-    } catch (e) {
-      print("Telegram Init Wait Error: $e");
-    }
-  }
-
-  static Future<Map> setPhoneNumber(String phoneNumber) async {
-    if (_client == null) throw Exception("Client not initialized");
-    // Ensure we wait for data if it's not ready yet
-    if (_tgData == null && _initCompleter != null) {
-       await _initCompleter!.future.timeout(const Duration(seconds: 5)).catchError((_) {});
-    }
-    if (_tgData == null) throw Exception("Telegram Client Data not ready");
-    return await _client!.invoke(
-      parameters: {
-        "@type": "setAuthenticationPhoneNumber",
-        "phone_number": phoneNumber,
-      },
-      telegramClientData: _tgData!,
+    await _client!.initConnection<t.Config>(
+      apiId: _apiId!,
+      deviceModel: 'Android Device',
+      systemVersion: 'Android 14',
+      appVersion: '1.0.0',
+      systemLangCode: 'en',
+      langPack: '',
+      langCode: 'en',
+      query: const t.HelpGetConfig(),
     );
   }
 
-  static Future<Map> checkCode(String code) async {
+  static Future<void> setPhoneNumber(String phoneNumber, String apiId, String apiHash) async {
     if (_client == null) throw Exception("Client not initialized");
-    if (_tgData == null) throw Exception("Telegram Client Data not ready");
-    return await _client!.invoke(
-      parameters: {
-        "@type": "checkAuthenticationCode",
-        "code": code,
-      },
-      telegramClientData: _tgData!,
-    );
+    _phone = phoneNumber;
+
+    final response = await _client!.invoke(t.AuthSendCode(
+      apiId: _apiId!,
+      apiHash: _apiHash!,
+      phoneNumber: phoneNumber,
+      settings: const t.CodeSettings(
+        allowFlashcall: false,
+        currentNumber: true,
+        allowAppHash: false,
+        allowMissedCall: false,
+        allowFirebase: false,
+        unknownNumber: false,
+      ),
+    ));
+
+    if (response.error != null) {
+      throw Exception("Error sending code: ${response.error!.errorMessage}");
+    }
+    _sentCode = response.result as t.AuthSentCode;
+  }
+
+  static Future<void> checkCode(String code) async {
+    if (_client == null || _sentCode == null || _phone == null) throw Exception("Flow not ready");
+
+    final response = await _client!.invoke(t.AuthSignIn(
+      phoneCodeHash: _sentCode!.phoneCodeHash,
+      phoneNumber: _phone!,
+      phoneCode: code,
+    ));
+
+    if (response.error != null) {
+      throw Exception("Error verifying code: ${response.error!.errorMessage}");
+    }
   }
 
   static Future<void> startProxy() async {
@@ -199,38 +206,32 @@ class TelegramService {
           const int chunkSize = 1024 * 1024; // 1MB chunks for better throughput
 
           while (true) {
-            if (_client == null || _tgData == null) break;
+            if (_client == null) break;
 
-            // In telegram_client/tdlib, streaming is usually done by requesting
-            // the file to be downloaded and listening to progress updates.
-            // However, some wrappers allow direct part reading.
+            if (_client == null) break;
 
-            // Implementation detail: we'll use 'readFilePart' if supported,
-            // otherwise we'd need a more complex 'downloadFile' listener.
-            final result = await _client!.invoke(
-              parameters: {
-                "@type": "readFilePart",
-                "file_id": fileId,
-                "offset": currentOffset,
-                "count": chunkSize,
-              },
-              telegramClientData: _tgData!,
-            );
+            final response = await _client!.invoke(t.UploadGetFile(
+              location: t.InputDocumentFileLocation(
+                id: int.parse(fileId),
+                accessHash: 0,
+                fileReference: Uint8List(0),
+                thumbSize: "",
+              ),
+              offset: currentOffset,
+              limit: chunkSize,
+              precise: false,
+              cdnSupported: false,
+            ));
 
-            if (result["@type"] == "filePart") {
-              final String dataBase64 = result["data"];
-              final List<int> chunk = base64.decode(dataBase64);
+            if (response.result is t.UploadFile) {
+              final file = response.result as t.UploadFile;
+              final chunk = file.bytes;
               if (chunk.isEmpty) break;
 
               controller.add(chunk);
               currentOffset += chunk.length;
-
-              // If we got less than requested, it's likely the end of file
               if (chunk.length < chunkSize) break;
             } else {
-              // If readFilePart is not supported or fails, we might try a fallback
-              // or just break if this conceptual bridge isn't fully linked to a specific build.
-              print('Proxy: readFilePart returned ${result["@type"]}');
               break;
             }
           }
@@ -270,5 +271,19 @@ class TelegramService {
 
   static String getProxyUrl(String fileId) {
     return 'http://localhost:$proxyPort/stream/$fileId';
+  }
+}
+
+class _IoSocket extends tg.SocketAbstraction {
+  _IoSocket(this.socket);
+  final Socket socket;
+
+  @override
+  Stream<Uint8List> get receiver => socket.cast<Uint8List>();
+
+  @override
+  Future<void> send(List<int> data) async {
+    socket.add(data);
+    await socket.flush();
   }
 }

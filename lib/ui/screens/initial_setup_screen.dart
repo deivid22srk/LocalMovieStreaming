@@ -38,7 +38,7 @@ class _InitialSetupScreenState extends State<InitialSetupScreen> {
         apiHash: _apiHashCtrl.text,
         dbPath: 'telegram_session',
       );
-      await TelegramService.setPhoneNumber(_phoneCtrl.text);
+      await TelegramService.setPhoneNumber(_phoneCtrl.text, _apiIdCtrl.text, _apiHashCtrl.text);
       _nextPage();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e')));

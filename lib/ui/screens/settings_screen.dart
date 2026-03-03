@@ -99,7 +99,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           dbPath: 'telegram_session',
         );
 
-        await TelegramService.setPhoneNumber(provider.tgPhoneNumber);
+        await TelegramService.setPhoneNumber(provider.tgPhoneNumber, provider.tgApiId, provider.tgApiHash);
 
         if (mounted) _showCodeDialog();
      } catch (e) {
