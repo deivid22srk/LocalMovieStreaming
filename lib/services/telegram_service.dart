@@ -29,32 +29,33 @@ class TelegramService {
   static String? _phone;
   static int? _apiId;
   static String? _apiHash;
+  static int _currentDcId = 1;
+
+  static final Map<int, String> _dcIps = {
+    1: '149.154.167.50',
+    2: '149.154.167.51',
+    3: '149.154.175.100',
+    4: '149.154.167.91',
+    5: '149.154.167.92',
+  };
 
   static Future<void> initClient({
     required String apiId,
     required String apiHash,
     required String dbPath,
+    int dcId = 1,
   }) async {
-    if (_client != null) return;
     _apiId = int.tryParse(apiId);
     _apiHash = apiHash;
+    _currentDcId = dcId;
 
-    const dc = t.DcOption(
-      ipv6: false,
-      mediaOnly: false,
-      tcpoOnly: false,
-      cdn: false,
-      static: false,
-      thisPortOnly: false,
-      id: 1,
-      ipAddress: '149.154.167.50',
-      port: 443,
-    );
+    final ip = _dcIps[dcId] ?? _dcIps[1]!;
+    print("Connecting to Telegram DC $dcId ($ip)...");
 
     try {
-      final socket = await Socket.connect(dc.ipAddress, dc.port);
+      final socket = await Socket.connect(ip, 443).timeout(const Duration(seconds: 10));
       final tgSocket = _IoSocket(socket);
-      final obfuscation = tg.Obfuscation.random(false, dc.id);
+      final obfuscation = tg.Obfuscation.random(false, dcId);
       final idGenerator = tg.MessageIdGenerator();
 
       await tgSocket.send(obfuscation.preamble);
@@ -83,12 +84,14 @@ class TelegramService {
         query: const t.HelpGetConfig(),
       );
     } catch (e) {
-       print("Init error: $e");
+       print("Init error DC $dcId: $e");
+       _client = null;
+       throw Exception("Failed to initialize Telegram client on DC $dcId: $e");
     }
   }
 
   static Future<void> setPhoneNumber(String phoneNumber, String apiId, String apiHash) async {
-    if (_client == null) throw Exception("Client not initialized");
+    if (_client == null) await initClient(apiId: apiId, apiHash: apiHash, dbPath: 'telegram_session');
     _phone = phoneNumber;
 
     final response = await _client!.invoke(t.AuthSendCode(
@@ -106,7 +109,15 @@ class TelegramService {
     ));
 
     if (response.error != null) {
-      throw Exception("Error sending code: ${response.error!.errorMessage}");
+      final err = response.error!.errorMessage;
+      if (err.startsWith('PHONE_MIGRATE_')) {
+         final nextDc = int.parse(err.split('_').last);
+         print("Phone Migration requested to DC $nextDc");
+         _client = null; // Reset current client
+         await initClient(apiId: apiId, apiHash: apiHash, dbPath: 'telegram_session', dcId: nextDc);
+         return setPhoneNumber(phoneNumber, apiId, apiHash); // Retry on new DC
+      }
+      throw Exception("Error sending code: $err");
     }
     _sentCode = response.result as t.AuthSentCode;
   }
