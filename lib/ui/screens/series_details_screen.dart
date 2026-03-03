@@ -178,7 +178,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
 
     if (ep.isTelegram && ep.telegramFileId != null) {
        await TelegramService.startProxy();
-       effectiveUrl = TelegramService.getProxyUrl(ep.telegramFileId!);
+       effectiveUrl = TelegramService.getProxyUrl(ep.telegramFileId!, accessHash: ep.telegramAccessHash);
     }
 
     if (useWeb) {

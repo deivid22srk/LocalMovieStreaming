@@ -16,68 +16,11 @@ class TelegramService {
 
   TelegramService(this.botToken);
 
-  Future<Map<String, dynamic>?> waitForNextVideo({String? groupId}) async {
-    int lastUpdateId = 0;
-
-    // Get last update ID first to avoid capturing old messages
-    try {
-      final initialResponse = await http.get(Uri.parse('https://api.telegram.org/bot$botToken/getUpdates?offset=-1'));
-      if (initialResponse.statusCode == 200) {
-        final data = json.decode(initialResponse.body);
-        if (data['ok'] == true && (data['result'] as List).isNotEmpty) {
-          lastUpdateId = data['result'][0]['update_id'];
-        }
-      }
-    } catch (e) {
-      print('Error getting initial Telegram update: $e');
-    }
-
-    final startTime = DateTime.now();
-    // Poll for 2 minutes
-    while (DateTime.now().difference(startTime).inMinutes < 2) {
-      try {
-        final response = await http.get(Uri.parse('https://api.telegram.org/bot$botToken/getUpdates?offset=${lastUpdateId + 1}&timeout=30'));
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          if (data['ok'] == true) {
-            final List results = data['result'];
-            for (var update in results) {
-              lastUpdateId = update['update_id'];
-              final message = update['message'] ?? update['channel_post'];
-              if (message != null) {
-                // Filter by group ID if provided
-                if (groupId != null && message['chat']['id'].toString() != groupId) continue;
-
-                final video = message['video'] ?? message['document'];
-                if (video != null && (message['video'] != null || _isFileTypeVideo(video['mime_type']))) {
-                  return {
-                    'file_id': video['file_id'],
-                    'file_name': video['file_name'] ?? 'video_${video['file_id']}.mp4',
-                    'file_size': video['file_size'],
-                    'mime_type': video['mime_type'],
-                    // For client API playback
-                    'access_hash': '', // Will be resolved by client API if needed
-                    'peer_id': message['chat']['id'].toString(),
-                  };
-                }
-              }
-            }
-          }
-        }
-      } catch (e) {
-        print('Error polling Telegram: $e');
-      }
-      await Future.delayed(const Duration(seconds: 2));
-    }
-    return null;
-  }
-
   bool _isFileTypeVideo(String? mime) {
     if (mime == null) return false;
     return mime.startsWith('video/') || mime == 'application/x-mpegURL' || mime == 'application/vnd.apple.mpegurl';
   }
 
-  // Local Proxy Server for Streaming
   static HttpServer? _server;
   static const int proxyPort = 8080;
 
@@ -108,36 +51,40 @@ class TelegramService {
       port: 443,
     );
 
-    final socket = await Socket.connect(dc.ipAddress, dc.port);
-    final tgSocket = _IoSocket(socket);
-    final obfuscation = tg.Obfuscation.random(false, dc.id);
-    final idGenerator = tg.MessageIdGenerator();
+    try {
+      final socket = await Socket.connect(dc.ipAddress, dc.port);
+      final tgSocket = _IoSocket(socket);
+      final obfuscation = tg.Obfuscation.random(false, dc.id);
+      final idGenerator = tg.MessageIdGenerator();
 
-    await tgSocket.send(obfuscation.preamble);
+      await tgSocket.send(obfuscation.preamble);
 
-    final authKey = await tg.Client.authorize(
-      tgSocket,
-      obfuscation,
-      idGenerator,
-    );
+      final authKey = await tg.Client.authorize(
+        tgSocket,
+        obfuscation,
+        idGenerator,
+      );
 
-    _client = tg.Client(
-      socket: tgSocket,
-      obfuscation: obfuscation,
-      authorizationKey: authKey,
-      idGenerator: idGenerator,
-    );
+      _client = tg.Client(
+        socket: tgSocket,
+        obfuscation: obfuscation,
+        authorizationKey: authKey,
+        idGenerator: idGenerator,
+      );
 
-    await _client!.initConnection<t.Config>(
-      apiId: _apiId!,
-      deviceModel: 'Android Device',
-      systemVersion: 'Android 14',
-      appVersion: '1.0.0',
-      systemLangCode: 'en',
-      langPack: '',
-      langCode: 'en',
-      query: const t.HelpGetConfig(),
-    );
+      await _client!.initConnection<t.Config>(
+        apiId: _apiId!,
+        deviceModel: 'Android Device',
+        systemVersion: 'Android 14',
+        appVersion: '1.0.0',
+        systemLangCode: 'en',
+        langPack: '',
+        langCode: 'en',
+        query: const t.HelpGetConfig(),
+      );
+    } catch (e) {
+       print("Init error: $e");
+    }
   }
 
   static Future<void> setPhoneNumber(String phoneNumber, String apiId, String apiHash) async {
@@ -178,6 +125,112 @@ class TelegramService {
     }
   }
 
+  static Future<List<Map<String, dynamic>>> getChats() async {
+    if (_client == null) throw Exception("Client not initialized");
+
+    final response = await _client!.invoke(t.MessagesGetDialogs(
+      offsetDate: DateTime.fromMillisecondsSinceEpoch(0),
+      offsetId: 0,
+      offsetPeer: const t.InputPeerEmpty(),
+      limit: 100,
+      hash: 0,
+      excludePinned: false,
+    ));
+
+    final List<Map<String, dynamic>> chats = [];
+    final res = response.result;
+    List<t.ChatBase> tChats = [];
+    if (res is t.MessagesDialogs) tChats = res.chats;
+    else if (res is t.MessagesDialogsSlice) tChats = res.chats;
+
+    for (var chat in tChats) {
+      String title = "Unknown";
+      String id = "";
+      int? accessHash;
+
+      if (chat is t.Chat) {
+        title = chat.title;
+        id = chat.id.toString();
+      } else if (chat is t.Channel) {
+        title = chat.title;
+        id = chat.id.toString();
+        accessHash = chat.accessHash;
+      }
+
+      if (id.isNotEmpty) {
+        chats.add({
+          'id': id,
+          'title': title,
+          'accessHash': accessHash,
+          'type': chat.runtimeType.toString(),
+        });
+      }
+    }
+    return chats;
+  }
+
+  static Future<List<Map<String, dynamic>>> getVideosFromChat(String chatId, int? accessHash) async {
+    if (_client == null) throw Exception("Client not initialized");
+
+    t.InputPeerBase peer;
+    final int id = int.parse(chatId);
+    if (accessHash != null) {
+       peer = t.InputPeerChannel(channelId: id, accessHash: accessHash);
+    } else {
+       peer = t.InputPeerChat(chatId: id);
+    }
+
+    final response = await _client!.invoke(t.MessagesSearch(
+      peer: peer,
+      q: "",
+      filter: const t.InputMessagesFilterVideo(),
+      minDate: DateTime.fromMillisecondsSinceEpoch(0),
+      maxDate: DateTime.fromMillisecondsSinceEpoch(0),
+      offsetId: 0,
+      addOffset: 0,
+      limit: 50,
+      maxId: 0,
+      minId: 0,
+      hash: 0,
+    ));
+
+    final List<Map<String, dynamic>> videos = [];
+    final res = response.result;
+    List<t.MessageBase> msgs = [];
+    if (res is t.MessagesMessages) msgs = res.messages;
+    else if (res is t.MessagesMessagesSlice) msgs = res.messages;
+    else if (res is t.MessagesChannelMessages) msgs = res.messages;
+
+    for (var msg in msgs) {
+      if (msg is t.Message) {
+        final media = msg.media;
+        if (media is t.MessageMediaDocument) {
+          final doc = media.document;
+          if (doc is t.Document) {
+            videos.add({
+              'id': doc.id.toString(),
+              'accessHash': doc.accessHash,
+              'fileReference': doc.fileReference,
+              'size': doc.size,
+              'fileName': _getFileNameFromDoc(doc),
+              'caption': msg.message,
+            });
+          }
+        }
+      }
+    }
+    return videos;
+  }
+
+  static String _getFileNameFromDoc(t.Document doc) {
+     for (var attr in doc.attributes) {
+        if (attr is t.DocumentAttributeFilename) {
+           return attr.fileName;
+        }
+     }
+     return "video_${doc.id}.mp4";
+  }
+
   static Future<void> startProxy() async {
     if (_server != null) return;
 
@@ -185,7 +238,8 @@ class TelegramService {
 
     router.get('/stream/<fileId>', (Request request, String fileId) async {
       final range = request.headers['range'];
-      print('Proxy Request: fileId=$fileId, range=$range');
+      final accessHashStr = request.url.queryParameters['accessHash'];
+      print('Proxy Request: fileId=$fileId, range=$range, accessHash=$accessHashStr');
 
       if (_client == null) {
         return Response.internalServerError(body: 'Telegram Client not initialized.');
@@ -199,21 +253,18 @@ class TelegramService {
 
       final controller = StreamController<List<int>>();
 
-      // Function to fetch chunks sequentially
       Future<void> fetchChunks() async {
         try {
           int currentOffset = offset;
-          const int chunkSize = 1024 * 1024; // 1MB chunks for better throughput
+          const int chunkSize = 1024 * 1024;
 
           while (true) {
-            if (_client == null) break;
-
             if (_client == null) break;
 
             final response = await _client!.invoke(t.UploadGetFile(
               location: t.InputDocumentFileLocation(
                 id: int.parse(fileId),
-                accessHash: 0,
+                accessHash: int.tryParse(accessHashStr ?? '0') ?? 0,
                 fileReference: Uint8List(0),
                 thumbSize: "",
               ),
@@ -269,8 +320,10 @@ class TelegramService {
     _server = null;
   }
 
-  static String getProxyUrl(String fileId) {
-    return 'http://localhost:$proxyPort/stream/$fileId';
+  static String getProxyUrl(String fileId, {String? accessHash}) {
+    String url = 'http://localhost:$proxyPort/stream/$fileId';
+    if (accessHash != null) url += '?accessHash=$accessHash';
+    return url;
   }
 }
 

@@ -102,7 +102,7 @@ class MovieDetailsScreen extends StatelessWidget {
 
     if (movie.isTelegram && movie.telegramFileId != null) {
        await TelegramService.startProxy();
-       effectiveUrl = TelegramService.getProxyUrl(movie.telegramFileId!);
+       effectiveUrl = TelegramService.getProxyUrl(movie.telegramFileId!, accessHash: movie.telegramAccessHash);
     }
 
     if (useWeb) {

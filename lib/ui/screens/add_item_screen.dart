@@ -5,6 +5,7 @@ import '../../providers/movie_provider.dart';
 import '../../models/movie_models.dart';
 import '../widgets/app_image.dart';
 import '../../services/telegram_service.dart';
+import 'telegram_selector_screen.dart';
 
 class AddItemScreen extends StatefulWidget {
   const AddItemScreen({super.key});
@@ -32,7 +33,8 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
   String? _tgFileId;
   String? _tgFileName;
   int? _tgFileSize;
-  String? _tgPeerId;
+  int? _tgAccessHash;
+  List<int>? _tgFileReference;
 
   List<dynamic> _searchResults = [];
   bool _isLoading = false;
@@ -98,7 +100,7 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
         telegramFileId: _tgFileId,
         telegramFileName: _tgFileName,
         telegramFileSize: _tgFileSize,
-        telegramPeerId: _tgPeerId,
+        telegramAccessHash: _tgAccessHash?.toString(),
         category: _categoryCtrl.text,
         isTelegram: _tgFileId != null,
       ));
@@ -109,62 +111,22 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
   }
 
   void _captureTelegram() async {
-    final provider = context.read<MovieProvider>();
-    if (provider.tgBotToken.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Configure o Bot Token nas configurações primeiro.')));
-      return;
-    }
-
-    setState(() => _isLoading = true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Aguardando vídeo no bot @${provider.tgBotUsername}...'), duration: const Duration(seconds: 10)),
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(builder: (_) => const TelegramSelectorScreen()),
     );
 
-    final tgService = TelegramService(provider.tgBotToken);
-    final videoData = await tgService.waitForNextVideo(groupId: provider.tgGroupId);
-
-    setState(() => _isLoading = false);
-
-    if (videoData != null) {
-      _showTelegramConfirmation(videoData);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tempo esgotado ou erro na captura.')));
+    if (result != null && mounted) {
+      setState(() {
+        _tgFileId = result['id'];
+        _tgFileName = result['fileName'];
+        _tgFileSize = result['size'];
+        _tgAccessHash = result['accessHash'];
+        _tgFileReference = result['fileReference'];
+        _manualUrlCtrl.text = 'TELEGRAM: ${_tgFileName}';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vídeo do Telegram selecionado!')));
     }
-  }
-
-  void _showTelegramConfirmation(Map<String, dynamic> data) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Vídeo Capturado!'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Arquivo: ${data['file_name']}'),
-            Text('Tamanho: ${(data['file_size'] / (1024 * 1024)).toStringAsFixed(2)} MB'),
-            const SizedBox(height: 10),
-            const Text('Deseja vincular este vídeo ao item atual?'),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCELAR')),
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _tgFileId = data['file_id'];
-                _tgFileName = data['file_name'];
-                _tgFileSize = data['file_size'];
-                _tgPeerId = data['peer_id'];
-                _manualUrlCtrl.text = 'TELEGRAM: ${_tgFileName}';
-              });
-              Navigator.pop(context);
-            },
-            child: const Text('VINCULAR'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showAddDialog(dynamic item) {
