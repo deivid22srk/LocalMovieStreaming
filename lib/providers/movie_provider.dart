@@ -16,10 +16,25 @@ class MovieProvider with ChangeNotifier {
   String _apiKey = '';
   bool _useNativePlayer = false;
 
+  // Telegram Settings
+  String _tgBotToken = '';
+  String _tgBotUsername = '';
+  String _tgApiId = '';
+  String _tgApiHash = '';
+  String _tgPhoneNumber = '';
+  bool _tgIsLoggedIn = false;
+
   List<Movie> get movies => _movies;
   List<Series> get seriesList => _seriesList;
   String get apiKey => _apiKey;
   bool get useNativePlayer => _useNativePlayer;
+
+  String get tgBotToken => _tgBotToken;
+  String get tgBotUsername => _tgBotUsername;
+  String get tgApiId => _tgApiId;
+  String get tgApiHash => _tgApiHash;
+  String get tgPhoneNumber => _tgPhoneNumber;
+  bool get tgIsLoggedIn => _tgIsLoggedIn;
 
   MovieProvider() {
     _loadSettings();
@@ -30,6 +45,14 @@ class MovieProvider with ChangeNotifier {
     _apiKey = prefs.getString('api_key') ?? '';
     _useNativePlayer = prefs.getBool('use_native_player') ?? false;
     _apiService.apiKey = _apiKey;
+
+    _tgBotToken = prefs.getString('tg_bot_token') ?? '';
+    _tgBotUsername = prefs.getString('tg_bot_username') ?? '';
+    _tgApiId = prefs.getString('tg_api_id') ?? '';
+    _tgApiHash = prefs.getString('tg_api_hash') ?? '';
+    _tgPhoneNumber = prefs.getString('tg_phone_number') ?? '';
+    _tgIsLoggedIn = prefs.getBool('tg_is_logged_in') ?? false;
+
     notifyListeners();
   }
 
@@ -43,6 +66,35 @@ class MovieProvider with ChangeNotifier {
   set useNativePlayer(bool value) {
     _useNativePlayer = value;
     SharedPreferences.getInstance().then((prefs) => prefs.setBool('use_native_player', value));
+    notifyListeners();
+  }
+
+  Future<void> saveTelegramConfig({
+    required String botToken,
+    required String botUsername,
+    required String apiId,
+    required String apiHash,
+    required String phoneNumber,
+  }) async {
+    _tgBotToken = botToken;
+    _tgBotUsername = botUsername;
+    _tgApiId = apiId;
+    _tgApiHash = apiHash;
+    _tgPhoneNumber = phoneNumber;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('tg_bot_token', botToken);
+    await prefs.setString('tg_bot_username', botUsername);
+    await prefs.setString('tg_api_id', apiId);
+    await prefs.setString('tg_api_hash', apiHash);
+    await prefs.setString('tg_phone_number', phoneNumber);
+
+    notifyListeners();
+  }
+
+  set tgIsLoggedIn(bool value) {
+    _tgIsLoggedIn = value;
+    SharedPreferences.getInstance().then((prefs) => prefs.setBool('tg_is_logged_in', value));
     notifyListeners();
   }
 

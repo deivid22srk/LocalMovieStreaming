@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import '../../providers/movie_provider.dart';
 import '../../models/movie_models.dart';
 import '../widgets/app_image.dart';
+import '../../services/telegram_service.dart';
 
 class AddItemScreen extends StatefulWidget {
   const AddItemScreen({super.key});
@@ -25,6 +26,12 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
   final TextEditingController _manualUrlCtrl = TextEditingController();
   final TextEditingController _webUrlCtrl = TextEditingController();
   final TextEditingController _dateCtrl = TextEditingController();
+
+  // Telegram Capture data
+  String? _tgFileId;
+  String? _tgFileName;
+  int? _tgFileSize;
+  String? _tgPeerId;
 
   List<dynamic> _searchResults = [];
   bool _isLoading = false;
@@ -86,11 +93,75 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
         webPlayerUrl: _webUrlCtrl.text,
         voteAverage: 0.0,
         releaseDate: _dateCtrl.text,
+        telegramFileId: _tgFileId,
+        telegramFileName: _tgFileName,
+        telegramFileSize: _tgFileSize,
+        telegramPeerId: _tgPeerId,
+        isTelegram: _tgFileId != null,
       ));
     }
 
     setState(() => _isLoading = false);
     if (mounted) Navigator.pop(context);
+  }
+
+  void _captureTelegram() async {
+    final provider = context.read<MovieProvider>();
+    if (provider.tgBotToken.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Configure o Bot Token nas configurações primeiro.')));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Aguardando vídeo no bot @${provider.tgBotUsername}...'), duration: const Duration(seconds: 10)),
+    );
+
+    final tgService = TelegramService(provider.tgBotToken);
+    final videoData = await tgService.waitForNextVideo();
+
+    setState(() => _isLoading = false);
+
+    if (videoData != null) {
+      _showTelegramConfirmation(videoData);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tempo esgotado ou erro na captura.')));
+    }
+  }
+
+  void _showTelegramConfirmation(Map<String, dynamic> data) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Vídeo Capturado!'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Arquivo: ${data['file_name']}'),
+            Text('Tamanho: ${(data['file_size'] / (1024 * 1024)).toStringAsFixed(2)} MB'),
+            const SizedBox(height: 10),
+            const Text('Deseja vincular este vídeo ao item atual?'),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCELAR')),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _tgFileId = data['file_id'];
+                _tgFileName = data['file_name'];
+                _tgFileSize = data['file_size'];
+                _tgPeerId = data['peer_id'];
+                _manualUrlCtrl.text = 'TELEGRAM: ${_tgFileName}';
+              });
+              Navigator.pop(context);
+            },
+            child: const Text('VINCULAR'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showAddDialog(dynamic item) {
@@ -241,6 +312,14 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
             TextField(controller: _manualUrlCtrl, decoration: const InputDecoration(labelText: 'URL do Vídeo')),
             TextField(controller: _webUrlCtrl, decoration: const InputDecoration(labelText: 'URL do Player Web (Opcional)')),
           ],
+          const SizedBox(height: 20),
+          if (!_manualIsSeries)
+            ElevatedButton.icon(
+              icon: const Icon(Icons.send),
+              onPressed: _captureTelegram,
+              label: const Text('CAPTURAR DO TELEGRAM'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+            ),
           const SizedBox(height: 20),
           _buildImagePickerRow('Capa (Poster)', _posterCtrl),
           const SizedBox(height: 10),
