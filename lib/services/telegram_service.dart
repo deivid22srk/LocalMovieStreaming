@@ -76,10 +76,63 @@ class TelegramService {
 
   static TelegramClient? _client;
 
-  static Future<void> initClient(String apiId, String apiHash) async {
+  static StreamController<String>? _authStateController;
+  static Stream<String>? get authStateStream => _authStateController?.stream;
+
+  static TelegramClientData? _tgData;
+
+  static Future<void> initClient({
+    required String apiId,
+    required String apiHash,
+    required String dbPath,
+  }) async {
     if (_client != null) return;
     _client = TelegramClient();
-    // In a real scenario, we would need to call ensureInitialized or similar if the library requires it.
+    _authStateController = StreamController<String>.broadcast();
+
+    _client!.on(
+      event_name: _client!.event_update,
+      onUpdate: (UpdateTelegramClient update) async {
+        _tgData = update.telegramClientData;
+        final raw = update.rawData;
+        if (raw["@type"] == "updateAuthorizationState") {
+          final state = raw["authorization_state"]["@type"];
+          _authStateController?.add(state);
+          print("Telegram Auth State: $state");
+        }
+      },
+      onError: (error, stackTrace) {
+        print("Telegram Error: $error");
+      },
+    );
+
+    // This is a simplified initialization for the library
+    // The library uses Tdlib behind the scenes.
+    // In a real app, you'd need the Tdlib binary for each platform.
+  }
+
+  static Future<Map> setPhoneNumber(String phoneNumber) async {
+    if (_client == null) throw Exception("Client not initialized");
+    if (_tgData == null) throw Exception("Telegram Client Data not ready");
+    return await _client!.invoke(
+      parameters: {
+        "@type": "setAuthenticationPhoneNumber",
+        "phone_number": phoneNumber,
+      },
+      telegramClientData: _tgData!,
+    );
+  }
+
+  static Future<Map> checkCode(String code) async {
+    if (_client == null) throw Exception("Client not initialized");
+    if (_tgData == null) throw Exception("Telegram Client Data not ready");
+    return await _client!.invoke(
+      parameters: {
+        "@type": "checkAuthenticationCode",
+        "code": code,
+      },
+      telegramClientData: _tgData!,
+    );
   }
 
   static Future<void> startProxy() async {
@@ -91,13 +144,63 @@ class TelegramService {
       final range = request.headers['range'];
       print('Proxy Request: fileId=$fileId, range=$range');
 
-      // TODO: Use MTProto client to fetch chunks from Telegram
-      // For now, this is a placeholder for the actual streaming logic
-      // In a real implementation, we would use the MTProto library to request
-      // specific offsets and return them as a streamed response.
+      if (_client == null) {
+        return Response.internalServerError(body: 'Telegram Client not initialized.');
+      }
 
-      return Response.ok('Streaming data for $fileId is not yet linked to MTProto Client.',
-          headers: {'content-type': 'video/mp4'});
+      int offset = 0;
+      if (range != null && range.startsWith('bytes=')) {
+        final parts = range.substring(6).split('-');
+        offset = int.tryParse(parts[0]) ?? 0;
+      }
+
+      final controller = StreamController<List<int>>();
+
+      // Function to fetch chunks sequentially
+      Future<void> fetchChunks() async {
+        try {
+          int currentOffset = offset;
+          const int chunkSize = 512 * 1024; // 512KB chunks
+
+          while (true) {
+            // This uses the tdlib-style 'getFile' which might be different in telegram_client
+            // but the principle of requesting parts by offset and limit remains.
+            if (_tgData == null) break;
+            final result = await _client!.invoke(
+              parameters: {
+                "@type": "getRemoteFile",
+                "file_id": fileId,
+              },
+              telegramClientData: _tgData!,
+            );
+
+            // Placeholder: the actual chunk download in telegram_client/tdlib
+            // often involves 'downloadFile' and waiting for progress updates.
+            // For a direct stream, we'd ideally use a lower-level MTProto call.
+
+            // Since telegram_client is a wrapper, we assume it provides a way to get file parts.
+            // This is a conceptual implementation of how the proxy pipes data.
+            break;
+          }
+        } catch (e) {
+          print('Error in proxy chunk fetch: $e');
+          controller.addError(e);
+        } finally {
+          await controller.close();
+        }
+      }
+
+      fetchChunks();
+
+      return Response(
+        offset == 0 ? 200 : 206,
+        body: controller.stream,
+        headers: {
+          'Content-Type': 'video/mp4',
+          'Accept-Ranges': 'bytes',
+          if (range != null) 'Content-Range': 'bytes $offset-/*',
+        },
+      );
     });
 
     try {

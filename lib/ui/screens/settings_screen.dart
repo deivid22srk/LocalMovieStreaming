@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/movie_provider.dart';
 import '../../services/storage_service.dart';
+import '../../services/telegram_service.dart';
 import 'library_management_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -56,6 +57,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Falha na importação ou cancelada.'), backgroundColor: Colors.red));
     }
+  }
+
+  void _startLoginFlow() async {
+     final provider = context.read<MovieProvider>();
+     if (provider.tgPhoneNumber.isEmpty || provider.tgApiId.isEmpty || provider.tgApiHash.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Preencha os campos de API e Telefone antes de logar.')));
+        return;
+     }
+
+     final messenger = ScaffoldMessenger.of(context);
+
+     try {
+        await TelegramService.initClient(
+          apiId: provider.tgApiId,
+          apiHash: provider.tgApiHash,
+          dbPath: 'telegram_session',
+        );
+
+        await TelegramService.setPhoneNumber(provider.tgPhoneNumber);
+
+        if (mounted) _showCodeDialog();
+     } catch (e) {
+        messenger.showSnackBar(SnackBar(content: Text('Erro no login: $e'), backgroundColor: Colors.red));
+     }
+  }
+
+  void _showCodeDialog() {
+    final codeCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Código do Telegram'),
+        content: TextField(
+          controller: codeCtrl,
+          decoration: const InputDecoration(hintText: 'Digite o código recebido'),
+          keyboardType: TextInputType.number,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCELAR')),
+          TextButton(
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              final provider = context.read<MovieProvider>();
+              try {
+                await TelegramService.checkCode(codeCtrl.text);
+                provider.tgIsLoggedIn = true;
+                if (mounted) {
+                   Navigator.pop(context);
+                   messenger.showSnackBar(const SnackBar(content: Text('Login realizado com sucesso!'), backgroundColor: Colors.green));
+                }
+              } catch (e) {
+                messenger.showSnackBar(SnackBar(content: Text('Erro ao verificar código: $e'), backgroundColor: Colors.red));
+              }
+            },
+            child: const Text('VERIFICAR'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _saveTelegram() async {
@@ -148,10 +209,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ? const Text('Status: LOGADO', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))
                   : ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-                      onPressed: () {
-                         // TODO: Implement Login Flow
-                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Login em breve...')));
-                      },
+                      onPressed: _startLoginFlow,
                       child: const Text('FAZER LOGIN CLIENTE'),
                     ),
               ],

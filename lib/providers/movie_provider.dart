@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/movie_models.dart';
 import '../services/database_service.dart';
 import '../services/api_service.dart';
+import '../services/telegram_service.dart';
 
 class MovieProvider with ChangeNotifier {
   final DatabaseService _dbService = DatabaseService();
@@ -52,6 +53,14 @@ class MovieProvider with ChangeNotifier {
     _tgApiHash = prefs.getString('tg_api_hash') ?? '';
     _tgPhoneNumber = prefs.getString('tg_phone_number') ?? '';
     _tgIsLoggedIn = prefs.getBool('tg_is_logged_in') ?? false;
+
+    if (_tgApiId.isNotEmpty && _tgApiHash.isNotEmpty) {
+       TelegramService.initClient(
+          apiId: _tgApiId,
+          apiHash: _tgApiHash,
+          dbPath: 'telegram_session',
+       );
+    }
 
     notifyListeners();
   }
