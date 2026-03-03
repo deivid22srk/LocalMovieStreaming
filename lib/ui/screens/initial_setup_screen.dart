@@ -23,7 +23,6 @@ class _InitialSetupScreenState extends State<InitialSetupScreen> {
   final TextEditingController _groupIdCtrl = TextEditingController();
 
   bool _isLoading = false;
-  int _currentPage = 0;
 
   void _nextPage() {
     _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.ease);
@@ -88,7 +87,6 @@ class _InitialSetupScreenState extends State<InitialSetupScreen> {
         child: PageView(
           controller: _pageController,
           physics: const NeverScrollableScrollPhysics(),
-          onPageChanged: (i) => setState(() => _currentPage = i),
           children: [
             _buildWelcomePage(),
             _buildApiPage(),

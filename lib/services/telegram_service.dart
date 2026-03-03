@@ -6,6 +6,9 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
 import 'package:telegram_client/telegram_client.dart';
+import 'package:telegram_client/scheme/telegram_client_library_tdlib_option_parameter.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 class TelegramService {
   final String botToken;
@@ -115,26 +118,29 @@ class TelegramService {
       },
     );
 
-    // Using the library's recommended initialization (conceptual for this environment)
-    // In a real app, you'd need to provide correct paths and options
-    /*
+    final appDir = await getApplicationDocumentsDirectory();
+    final tgDir = Directory(p.join(appDir.path, dbPath));
+    if (!tgDir.existsSync()) tgDir.createSync(recursive: true);
+
     _client!.ensureInitialized(
-       pathTdlib: "path/to/tdlib",
        telegramClientTdlibOption: TelegramClientTdlibOption(
          clientOption: TelegramClientLibraryTdlibOptionParameter.create(
-           database_directory: dbPath,
-           api_id: int.parse(apiId),
+           database_directory: tgDir.path,
+           files_directory: tgDir.path,
+           api_id: int.tryParse(apiId) ?? 0,
            api_hash: apiHash,
          ),
        ),
     );
+
     await _client!.tdlib.createclient(clientId: _client!.tdlib.td_create_client_id());
-    */
 
     // Wait for the first update to populate _tgData
-    await _initCompleter!.future.timeout(const Duration(seconds: 10), onTimeout: () {
-      print("Telegram Init Timeout");
-    });
+    try {
+      await _initCompleter!.future.timeout(const Duration(seconds: 15));
+    } catch (e) {
+      print("Telegram Init Wait Error: $e");
+    }
   }
 
   static Future<Map> setPhoneNumber(String phoneNumber) async {
