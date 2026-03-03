@@ -72,6 +72,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result ?? 'Erro desconhecido')));
   }
 
+  void _restoreFromTelegram() async {
+     final provider = context.read<MovieProvider>();
+     if (provider.tgBotToken.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Configure o Bot Token primeiro.')));
+        return;
+     }
+     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Buscando backup no Telegram...')));
+     final result = await _storageService.restoreFromTelegram(provider.tgBotToken);
+     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result ?? 'Erro desconhecido')));
+  }
+
   void _startLoginFlow() async {
      final provider = context.read<MovieProvider>();
      if (provider.tgPhoneNumber.isEmpty || provider.tgApiId.isEmpty || provider.tgApiHash.isEmpty) {
@@ -160,6 +171,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('Gerenciar Biblioteca'),
             subtitle: const Text('Edite ou remova filmes e séries já adicionados.'),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryManagementScreen())),
+            tileColor: Colors.white.withOpacity(0.05),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          const SizedBox(height: 10),
+          ListTile(
+            leading: const Icon(Icons.cloud_download),
+            title: const Text('Restaurar via Telegram'),
+            subtitle: const Text('Busca o backup mais recente no seu grupo do Telegram.'),
+            onTap: _restoreFromTelegram,
             tileColor: Colors.white.withOpacity(0.05),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),

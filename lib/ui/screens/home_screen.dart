@@ -199,9 +199,25 @@ class _MovieSection extends StatelessWidget {
                 child: Container(
                   width: 120,
                   margin: const EdgeInsets.symmetric(horizontal: 10),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: AppImage(path: movie.posterPath),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: AppImage(path: movie.posterPath),
+                        ),
+                      ),
+                      if (movie.category != null && movie.category!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            movie.category!,
+                            style: const TextStyle(fontSize: 10, color: Colors.white54),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               );
@@ -246,9 +262,25 @@ class _SeriesSection extends StatelessWidget {
                 child: Container(
                   width: 120,
                   margin: const EdgeInsets.symmetric(horizontal: 10),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: AppImage(path: series.posterPath),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: AppImage(path: series.posterPath),
+                        ),
+                      ),
+                      if (series.category != null && series.category!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            series.category!,
+                            style: const TextStyle(fontSize: 10, color: Colors.white54),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               );

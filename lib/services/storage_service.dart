@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:archive/archive_io.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -104,6 +105,13 @@ class StorageService {
     if (result != null && result.files.single.path != null) {
       final file = File(result.files.single.path!);
       final bytes = await file.readAsBytes();
+      return await _applyBackup(bytes);
+    }
+    return false;
+  }
+
+  Future<bool> _applyBackup(List<int> bytes) async {
+    try {
       final archive = ZipDecoder().decodeBytes(bytes);
 
       final appDir = await getApplicationDocumentsDirectory();
@@ -122,8 +130,50 @@ class StorageService {
         }
       }
       return true;
+    } catch (e) {
+      print('Error applying backup: $e');
+      return false;
     }
-    return false;
+  }
+
+  Future<String?> restoreFromTelegram(String botToken) async {
+    try {
+      // Get the last updates to find the backup file
+      final response = await http.get(Uri.parse('https://api.telegram.org/bot$botToken/getUpdates?limit=10&offset=-10'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['ok'] == true && (data['result'] as List).isNotEmpty) {
+          final results = List.from(data['result']).reversed;
+          for (var update in results) {
+            final message = update['message'] ?? update['channel_post'];
+            if (message != null && message['document'] != null) {
+              final doc = message['document'];
+              final fileName = doc['file_name'] ?? '';
+              if (fileName.contains('local_movie_backup') && fileName.endsWith('.zip')) {
+                final fileId = doc['file_id'];
+
+                // Get file path from Telegram
+                final fileInfoResp = await http.get(Uri.parse('https://api.telegram.org/bot$botToken/getFile?file_id=$fileId'));
+                final fileInfo = json.decode(fileInfoResp.body);
+
+                if (fileInfo['ok'] == true) {
+                  final filePath = fileInfo['result']['file_path'];
+                  final downloadUrl = 'https://api.telegram.org/file/bot$botToken/$filePath';
+
+                  // Download and apply
+                  final bytes = await http.readBytes(Uri.parse(downloadUrl));
+                  final success = await _applyBackup(bytes);
+                  return success ? 'Restauração via Telegram concluída!' : 'Erro ao processar arquivo de backup.';
+                }
+              }
+            }
+          }
+        }
+      }
+      return 'Nenhum backup ZIP recente encontrado no Telegram.';
+    } catch (e) {
+      return 'Erro na restauração: $e';
+    }
   }
 
   Future<String?> backupToTelegram(String botToken, String chatId) async {

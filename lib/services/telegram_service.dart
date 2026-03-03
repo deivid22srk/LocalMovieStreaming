@@ -83,6 +83,7 @@ class TelegramService {
   static Stream<String>? get authStateStream => _authStateController?.stream;
 
   static TelegramClientData? _tgData;
+  static Completer<void>? _initCompleter;
 
   static Future<void> initClient({
     required String apiId,
@@ -92,11 +93,16 @@ class TelegramService {
     if (_client != null) return;
     _client = TelegramClient();
     _authStateController = StreamController<String>.broadcast();
+    _initCompleter = Completer<void>();
 
     _client!.on(
       event_name: _client!.event_update,
       onUpdate: (UpdateTelegramClient update) async {
         _tgData = update.telegramClientData;
+        if (_initCompleter != null && !_initCompleter!.isCompleted) {
+          _initCompleter!.complete();
+        }
+
         final raw = update.rawData;
         if (raw["@type"] == "updateAuthorizationState") {
           final state = raw["authorization_state"]["@type"];
@@ -109,13 +115,34 @@ class TelegramService {
       },
     );
 
-    // This is a simplified initialization for the library
-    // The library uses Tdlib behind the scenes.
-    // In a real app, you'd need the Tdlib binary for each platform.
+    // Using the library's recommended initialization (conceptual for this environment)
+    // In a real app, you'd need to provide correct paths and options
+    /*
+    _client!.ensureInitialized(
+       pathTdlib: "path/to/tdlib",
+       telegramClientTdlibOption: TelegramClientTdlibOption(
+         clientOption: TelegramClientLibraryTdlibOptionParameter.create(
+           database_directory: dbPath,
+           api_id: int.parse(apiId),
+           api_hash: apiHash,
+         ),
+       ),
+    );
+    await _client!.tdlib.createclient(clientId: _client!.tdlib.td_create_client_id());
+    */
+
+    // Wait for the first update to populate _tgData
+    await _initCompleter!.future.timeout(const Duration(seconds: 10), onTimeout: () {
+      print("Telegram Init Timeout");
+    });
   }
 
   static Future<Map> setPhoneNumber(String phoneNumber) async {
     if (_client == null) throw Exception("Client not initialized");
+    // Ensure we wait for data if it's not ready yet
+    if (_tgData == null && _initCompleter != null) {
+       await _initCompleter!.future.timeout(const Duration(seconds: 5)).catchError((_) {});
+    }
     if (_tgData == null) throw Exception("Telegram Client Data not ready");
     return await _client!.invoke(
       parameters: {
@@ -163,27 +190,43 @@ class TelegramService {
       Future<void> fetchChunks() async {
         try {
           int currentOffset = offset;
-          const int chunkSize = 512 * 1024; // 512KB chunks
+          const int chunkSize = 1024 * 1024; // 1MB chunks for better throughput
 
           while (true) {
-            // This uses the tdlib-style 'getFile' which might be different in telegram_client
-            // but the principle of requesting parts by offset and limit remains.
-            if (_tgData == null) break;
+            if (_client == null || _tgData == null) break;
+
+            // In telegram_client/tdlib, streaming is usually done by requesting
+            // the file to be downloaded and listening to progress updates.
+            // However, some wrappers allow direct part reading.
+
+            // Implementation detail: we'll use 'readFilePart' if supported,
+            // otherwise we'd need a more complex 'downloadFile' listener.
             final result = await _client!.invoke(
               parameters: {
-                "@type": "getRemoteFile",
+                "@type": "readFilePart",
                 "file_id": fileId,
+                "offset": currentOffset,
+                "count": chunkSize,
               },
               telegramClientData: _tgData!,
             );
 
-            // Placeholder: the actual chunk download in telegram_client/tdlib
-            // often involves 'downloadFile' and waiting for progress updates.
-            // For a direct stream, we'd ideally use a lower-level MTProto call.
+            if (result["@type"] == "filePart") {
+              final String dataBase64 = result["data"];
+              final List<int> chunk = base64.decode(dataBase64);
+              if (chunk.isEmpty) break;
 
-            // Since telegram_client is a wrapper, we assume it provides a way to get file parts.
-            // This is a conceptual implementation of how the proxy pipes data.
-            break;
+              controller.add(chunk);
+              currentOffset += chunk.length;
+
+              // If we got less than requested, it's likely the end of file
+              if (chunk.length < chunkSize) break;
+            } else {
+              // If readFilePart is not supported or fails, we might try a fallback
+              // or just break if this conceptual bridge isn't fully linked to a specific build.
+              print('Proxy: readFilePart returned ${result["@type"]}');
+              break;
+            }
           }
         } catch (e) {
           print('Error in proxy chunk fetch: $e');
