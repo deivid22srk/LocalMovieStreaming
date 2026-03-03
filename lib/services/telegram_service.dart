@@ -12,7 +12,7 @@ class TelegramService {
 
   TelegramService(this.botToken);
 
-  Future<Map<String, dynamic>?> waitForNextVideo() async {
+  Future<Map<String, dynamic>?> waitForNextVideo({String? groupId}) async {
     int lastUpdateId = 0;
 
     // Get last update ID first to avoid capturing old messages
@@ -39,8 +39,11 @@ class TelegramService {
             final List results = data['result'];
             for (var update in results) {
               lastUpdateId = update['update_id'];
-              final message = update['message'];
+              final message = update['message'] ?? update['channel_post'];
               if (message != null) {
+                // Filter by group ID if provided
+                if (groupId != null && message['chat']['id'].toString() != groupId) continue;
+
                 final video = message['video'] ?? message['document'];
                 if (video != null && (message['video'] != null || _isFileTypeVideo(video['mime_type']))) {
                   return {
@@ -50,7 +53,7 @@ class TelegramService {
                     'mime_type': video['mime_type'],
                     // For client API playback
                     'access_hash': '', // Will be resolved by client API if needed
-                    'peer_id': message['from']['id'].toString(),
+                    'peer_id': message['chat']['id'].toString(),
                   };
                 }
               }

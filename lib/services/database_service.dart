@@ -22,7 +22,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'movie_streaming.db');
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -47,6 +47,7 @@ class DatabaseService {
         telegramPeerId TEXT,
         telegramFileName TEXT,
         telegramFileSize INTEGER,
+        category TEXT,
         isTelegram INTEGER DEFAULT 0
       )
     ''');
@@ -59,7 +60,8 @@ class DatabaseService {
         posterPath TEXT,
         backdropPath TEXT,
         voteAverage REAL,
-        firstAirDate TEXT
+        firstAirDate TEXT,
+        category TEXT
       )
     ''');
 
@@ -117,6 +119,10 @@ class DatabaseService {
       await db.execute('ALTER TABLE episodes ADD COLUMN telegramFileName TEXT');
       await db.execute('ALTER TABLE episodes ADD COLUMN telegramFileSize INTEGER');
       await db.execute('ALTER TABLE episodes ADD COLUMN isTelegram INTEGER DEFAULT 0');
+    }
+    if (oldVersion < 4) {
+      await db.execute('ALTER TABLE movies ADD COLUMN category TEXT');
+      await db.execute('ALTER TABLE series ADD COLUMN category TEXT');
     }
   }
 

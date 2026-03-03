@@ -19,6 +19,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _tgIdCtrl = TextEditingController();
   final TextEditingController _tgHashCtrl = TextEditingController();
   final TextEditingController _tgPhoneCtrl = TextEditingController();
+  final TextEditingController _tgGroupCtrl = TextEditingController();
 
   final StorageService _storageService = StorageService();
 
@@ -32,6 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _tgIdCtrl.text = p.tgApiId;
     _tgHashCtrl.text = p.tgApiHash;
     _tgPhoneCtrl.text = p.tgPhoneNumber;
+    _tgGroupCtrl.text = p.tgGroupId;
   }
 
   void _export() async {
@@ -57,6 +59,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Falha na importação ou cancelada.'), backgroundColor: Colors.red));
     }
+  }
+
+  void _backupToTelegram() async {
+     final provider = context.read<MovieProvider>();
+     if (provider.tgBotToken.isEmpty || provider.tgGroupId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Configure o Bot Token e Group ID primeiro.')));
+        return;
+     }
+     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enviando backup para o Telegram...')));
+     final result = await _storageService.backupToTelegram(provider.tgBotToken, provider.tgGroupId);
+     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result ?? 'Erro desconhecido')));
   }
 
   void _startLoginFlow() async {
@@ -126,6 +139,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       apiId: _tgIdCtrl.text,
       apiHash: _tgHashCtrl.text,
       phoneNumber: _tgPhoneCtrl.text,
+      groupId: _tgGroupCtrl.text,
     );
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Configurações do Telegram salvas!')));
   }
@@ -146,6 +160,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('Gerenciar Biblioteca'),
             subtitle: const Text('Edite ou remova filmes e séries já adicionados.'),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryManagementScreen())),
+            tileColor: Colors.white.withOpacity(0.05),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          const SizedBox(height: 10),
+          ListTile(
+            leading: const Icon(Icons.cloud_upload),
+            title: const Text('Backup via Telegram'),
+            subtitle: const Text('Envia o arquivo ZIP de backup para o seu grupo do Telegram.'),
+            onTap: _backupToTelegram,
             tileColor: Colors.white.withOpacity(0.05),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
@@ -199,6 +222,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 TextField(controller: _tgIdCtrl, decoration: const InputDecoration(labelText: 'API ID')),
                 TextField(controller: _tgHashCtrl, decoration: const InputDecoration(labelText: 'API Hash')),
                 TextField(controller: _tgPhoneCtrl, decoration: const InputDecoration(labelText: 'Número do Telefone (com DDI)')),
+                TextField(controller: _tgGroupCtrl, decoration: const InputDecoration(labelText: 'Group ID')),
                 const SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: _saveTelegram,

@@ -26,6 +26,7 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
   final TextEditingController _manualUrlCtrl = TextEditingController();
   final TextEditingController _webUrlCtrl = TextEditingController();
   final TextEditingController _dateCtrl = TextEditingController();
+  final TextEditingController _categoryCtrl = TextEditingController();
 
   // Telegram Capture data
   String? _tgFileId;
@@ -82,6 +83,7 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
         backdropPath: _backdropCtrl.text,
         voteAverage: 0.0,
         firstAirDate: _dateCtrl.text,
+        category: _categoryCtrl.text,
       ));
     } else {
       await provider.addMovie(Movie(
@@ -97,6 +99,7 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
         telegramFileName: _tgFileName,
         telegramFileSize: _tgFileSize,
         telegramPeerId: _tgPeerId,
+        category: _categoryCtrl.text,
         isTelegram: _tgFileId != null,
       ));
     }
@@ -118,7 +121,7 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
     );
 
     final tgService = TelegramService(provider.tgBotToken);
-    final videoData = await tgService.waitForNextVideo();
+    final videoData = await tgService.waitForNextVideo(groupId: provider.tgGroupId);
 
     setState(() => _isLoading = false);
 
@@ -308,6 +311,7 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
           TextField(controller: _titleCtrl, decoration: const InputDecoration(labelText: 'Título')),
           TextField(controller: _overviewCtrl, decoration: const InputDecoration(labelText: 'Sinopse'), maxLines: 3),
           TextField(controller: _dateCtrl, decoration: const InputDecoration(labelText: 'Data de Lançamento (Ex: 2024-01-01)')),
+          TextField(controller: _categoryCtrl, decoration: const InputDecoration(labelText: 'Categoria')),
           if (!_manualIsSeries) ...[
             TextField(controller: _manualUrlCtrl, decoration: const InputDecoration(labelText: 'URL do Vídeo')),
             TextField(controller: _webUrlCtrl, decoration: const InputDecoration(labelText: 'URL do Player Web (Opcional)')),

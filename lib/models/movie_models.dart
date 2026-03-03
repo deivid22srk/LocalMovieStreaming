@@ -15,6 +15,7 @@ class Movie {
   final String? telegramPeerId;
   final String? telegramFileName;
   final int? telegramFileSize;
+  final String? category;
   final bool isTelegram;
 
   Movie({
@@ -34,6 +35,7 @@ class Movie {
     this.telegramPeerId,
     this.telegramFileName,
     this.telegramFileSize,
+    this.category,
     this.isTelegram = false,
   });
 
@@ -55,6 +57,7 @@ class Movie {
       'telegramPeerId': telegramPeerId,
       'telegramFileName': telegramFileName,
       'telegramFileSize': telegramFileSize,
+      'category': category,
       'isTelegram': isTelegram ? 1 : 0,
     };
   }
@@ -77,6 +80,7 @@ class Movie {
       telegramPeerId: map['telegramPeerId'],
       telegramFileName: map['telegramFileName'],
       telegramFileSize: map['telegramFileSize'],
+      category: map['category'],
       isTelegram: map['isTelegram'] == 1,
     );
   }
@@ -90,6 +94,7 @@ class Series {
   final String backdropPath;
   final double voteAverage;
   final String firstAirDate;
+  final String? category;
 
   Series({
     this.id,
@@ -99,6 +104,7 @@ class Series {
     required this.backdropPath,
     required this.voteAverage,
     required this.firstAirDate,
+    this.category,
   });
 
   Map<String, dynamic> toMap() {
@@ -110,6 +116,7 @@ class Series {
       'backdropPath': backdropPath,
       'voteAverage': voteAverage,
       'firstAirDate': firstAirDate,
+      'category': category,
     };
   }
 
@@ -122,6 +129,7 @@ class Series {
       backdropPath: map['backdropPath'],
       voteAverage: map['voteAverage'],
       firstAirDate: map['firstAirDate'],
+      category: map['category'],
     );
   }
 }

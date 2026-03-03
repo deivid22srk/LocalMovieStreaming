@@ -3,22 +3,29 @@ import 'package:provider/provider.dart';
 import 'package:media_kit/media_kit.dart';
 import 'providers/movie_provider.dart';
 import 'ui/screens/home_screen.dart';
+import 'ui/screens/initial_setup_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
+
+  final prefs = await SharedPreferences.getInstance();
+  final isFirstRun = prefs.getBool('is_first_run') ?? true;
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => MovieProvider()),
       ],
-      child: const MyApp(),
+      child: MyApp(isFirstRun: isFirstRun),
     ),
   );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool isFirstRun;
+  const MyApp({super.key, required this.isFirstRun});
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +51,7 @@ class MyApp extends StatelessWidget {
           bodyLarge: TextStyle(fontSize: 16, color: Colors.white70),
         ),
       ),
-      home: const HomeScreen(),
+      home: isFirstRun ? const InitialSetupScreen() : const HomeScreen(),
     );
   }
 }

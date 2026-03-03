@@ -23,6 +23,7 @@ class MovieProvider with ChangeNotifier {
   String _tgApiId = '';
   String _tgApiHash = '';
   String _tgPhoneNumber = '';
+  String _tgGroupId = '';
   bool _tgIsLoggedIn = false;
 
   List<Movie> get movies => _movies;
@@ -35,6 +36,7 @@ class MovieProvider with ChangeNotifier {
   String get tgApiId => _tgApiId;
   String get tgApiHash => _tgApiHash;
   String get tgPhoneNumber => _tgPhoneNumber;
+  String get tgGroupId => _tgGroupId;
   bool get tgIsLoggedIn => _tgIsLoggedIn;
 
   MovieProvider() {
@@ -52,6 +54,7 @@ class MovieProvider with ChangeNotifier {
     _tgApiId = prefs.getString('tg_api_id') ?? '';
     _tgApiHash = prefs.getString('tg_api_hash') ?? '';
     _tgPhoneNumber = prefs.getString('tg_phone_number') ?? '';
+    _tgGroupId = prefs.getString('tg_group_id') ?? '';
     _tgIsLoggedIn = prefs.getBool('tg_is_logged_in') ?? false;
 
     if (_tgApiId.isNotEmpty && _tgApiHash.isNotEmpty) {
@@ -84,12 +87,14 @@ class MovieProvider with ChangeNotifier {
     required String apiId,
     required String apiHash,
     required String phoneNumber,
+    String? groupId,
   }) async {
     _tgBotToken = botToken;
     _tgBotUsername = botUsername;
     _tgApiId = apiId;
     _tgApiHash = apiHash;
     _tgPhoneNumber = phoneNumber;
+    if (groupId != null) _tgGroupId = groupId;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('tg_bot_token', botToken);
@@ -97,6 +102,7 @@ class MovieProvider with ChangeNotifier {
     await prefs.setString('tg_api_id', apiId);
     await prefs.setString('tg_api_hash', apiHash);
     await prefs.setString('tg_phone_number', phoneNumber);
+    if (groupId != null) await prefs.setString('tg_group_id', groupId);
 
     notifyListeners();
   }
