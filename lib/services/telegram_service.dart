@@ -328,11 +328,11 @@ class TelegramService {
 }
 
 class _IoSocket extends tg.SocketAbstraction {
-  _IoSocket(this.socket);
+  _IoSocket(this.socket) : receiver = socket.cast<Uint8List>().asBroadcastStream();
   final Socket socket;
 
   @override
-  Stream<Uint8List> get receiver => socket.cast<Uint8List>();
+  final Stream<Uint8List> receiver;
 
   @override
   Future<void> send(List<int> data) async {
