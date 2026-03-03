@@ -39,6 +39,7 @@ class VlcPlayerActivity : AppCompatActivity() {
     private var videoUrl: String? = null
     private var videoTitle: String? = null
     private var initialPosition: Long = 0
+    private var isPositionApplied = false
 
     private lateinit var playPauseBtn: ImageButton
     private lateinit var seekBar: SeekBar
@@ -49,7 +50,7 @@ class VlcPlayerActivity : AppCompatActivity() {
     private var isControlsVisible = true
     private var hideTimer: Timer? = null
 
-    private val aspectRatios = arrayOf(null, "16:9", "4:3", "16:10", "2.35:1")
+    private var aspectRatios = arrayOf<String?>(null, "16:9", "4:3", "16:10", "2.35:1")
     private var currentAspectRatioIndex = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -97,15 +98,22 @@ class VlcPlayerActivity : AppCompatActivity() {
             }
 
             mediaPlayer?.play()
-            if (initialPosition > 0) {
-                mediaPlayer?.time = initialPosition
-            }
         } catch (e: Exception) {
             Log.e(TAG, "Error initializing VLC", e)
         }
 
         setupListeners()
         startHideTimer()
+        calculateFillAspectRatio()
+    }
+
+    private fun calculateFillAspectRatio() {
+        val displayMetrics = resources.displayMetrics
+        val width = displayMetrics.widthPixels
+        val height = displayMetrics.heightPixels
+        val screenRatio = "$width:$height"
+        aspectRatios = arrayOf(null, "16:9", "4:3", "16:10", "2.35:1", screenRatio)
+        Log.d(TAG, "Screen Aspect Ratio (Fill): $screenRatio")
     }
 
     private fun hideSystemUI() {
@@ -120,7 +128,14 @@ class VlcPlayerActivity : AppCompatActivity() {
         currentAspectRatioIndex = (currentAspectRatioIndex + 1) % aspectRatios.size
         val newRatio = aspectRatios[currentAspectRatioIndex]
         mediaPlayer?.aspectRatio = newRatio
-        val toastText = if (newRatio == null) "Original" else newRatio
+
+        val isFill = currentAspectRatioIndex == aspectRatios.size - 1
+        val toastText = when {
+            newRatio == null -> "Original"
+            isFill -> "Preencher Tela"
+            else -> newRatio
+        }
+
         android.widget.Toast.makeText(this, "Aspect Ratio: $toastText", android.widget.Toast.LENGTH_SHORT).show()
         Log.d(TAG, "Aspect Ratio changed to: $newRatio")
     }
@@ -182,6 +197,15 @@ class VlcPlayerActivity : AppCompatActivity() {
 
         mediaPlayer?.setEventListener { event ->
             when (event.type) {
+                MediaPlayer.Event.Playing -> {
+                    if (!isPositionApplied && initialPosition > 0) {
+                        runOnUiThread {
+                            mediaPlayer?.time = initialPosition
+                            isPositionApplied = true
+                            Log.d(TAG, "Applied initial position: $initialPosition")
+                        }
+                    }
+                }
                 MediaPlayer.Event.PositionChanged -> {
                     runOnUiThread {
                         seekBar.max = mediaPlayer?.length?.toInt() ?: 0
