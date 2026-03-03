@@ -8,6 +8,7 @@ import '../widgets/app_image.dart';
 import 'player_screen.dart';
 import 'web_player_screen.dart';
 import '../../services/native_player_service.dart';
+import '../../services/telegram_service.dart';
 
 class SeriesDetailsScreen extends StatefulWidget {
   final Series series;
@@ -173,6 +174,12 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
 
   void _play(Episode ep, bool useWeb) async {
     final provider = context.read<MovieProvider>();
+    String effectiveUrl = ep.videoUrl;
+
+    if (ep.isTelegram && ep.telegramFileId != null) {
+       await TelegramService.startProxy();
+       effectiveUrl = TelegramService.getProxyUrl(ep.telegramFileId!, accessHash: ep.telegramAccessHash);
+    }
 
     if (useWeb) {
       Navigator.push(
@@ -183,14 +190,14 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
     }
 
     if (provider.useNativePlayer) {
-      final newPos = await NativePlayerService.playVideo(ep.videoUrl, ep.title, ep.watchProgress);
+      final newPos = await NativePlayerService.playVideo(effectiveUrl, ep.title, ep.watchProgress);
       provider.updateEpisodeProgress(ep.id!, newPos);
     } else {
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => PlayerScreen(
-            videoUrl: ep.videoUrl,
+            videoUrl: effectiveUrl,
             title: ep.title,
             initialPosition: Duration(milliseconds: ep.watchProgress),
             onProgressUpdate: (pos) {

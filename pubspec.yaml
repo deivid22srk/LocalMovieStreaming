@@ -53,6 +53,11 @@ dependencies:
   media_kit_libs_video: ^1.0.7
   webview_flutter: ^4.13.1
   shared_preferences: ^2.5.4
+  shelf: ^1.4.1
+  shelf_router: ^1.1.4
+  tg: ^0.0.16
+  t: ^1.0.0
+  cryptography: ^2.5.0
 
 dev_dependencies:
   flutter_test:

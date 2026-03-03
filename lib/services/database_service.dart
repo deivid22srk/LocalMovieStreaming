@@ -22,7 +22,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'movie_streaming.db');
     return await openDatabase(
       path,
-      version: 2,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -41,7 +41,14 @@ class DatabaseService {
         voteAverage REAL,
         releaseDate TEXT,
         watchProgress INTEGER,
-        duration INTEGER
+        duration INTEGER,
+        telegramFileId TEXT,
+        telegramAccessHash TEXT,
+        telegramPeerId TEXT,
+        telegramFileName TEXT,
+        telegramFileSize INTEGER,
+        category TEXT,
+        isTelegram INTEGER DEFAULT 0
       )
     ''');
 
@@ -53,7 +60,8 @@ class DatabaseService {
         posterPath TEXT,
         backdropPath TEXT,
         voteAverage REAL,
-        firstAirDate TEXT
+        firstAirDate TEXT,
+        category TEXT
       )
     ''');
 
@@ -81,16 +89,41 @@ class DatabaseService {
         webPlayerUrl TEXT,
         watchProgress INTEGER,
         duration INTEGER,
+        telegramFileId TEXT,
+        telegramAccessHash TEXT,
+        telegramPeerId TEXT,
+        telegramFileName TEXT,
+        telegramFileSize INTEGER,
+        isTelegram INTEGER DEFAULT 0,
         FOREIGN KEY (seasonId) REFERENCES seasons (id) ON DELETE CASCADE
       )
     ''');
   }
 
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
-     if (oldVersion < 2) {
-        await db.execute('ALTER TABLE movies ADD COLUMN webPlayerUrl TEXT DEFAULT ""');
-        await db.execute('ALTER TABLE episodes ADD COLUMN webPlayerUrl TEXT DEFAULT ""');
-     }
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE movies ADD COLUMN webPlayerUrl TEXT DEFAULT ""');
+      await db.execute('ALTER TABLE episodes ADD COLUMN webPlayerUrl TEXT DEFAULT ""');
+    }
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE movies ADD COLUMN telegramFileId TEXT');
+      await db.execute('ALTER TABLE movies ADD COLUMN telegramAccessHash TEXT');
+      await db.execute('ALTER TABLE movies ADD COLUMN telegramPeerId TEXT');
+      await db.execute('ALTER TABLE movies ADD COLUMN telegramFileName TEXT');
+      await db.execute('ALTER TABLE movies ADD COLUMN telegramFileSize INTEGER');
+      await db.execute('ALTER TABLE movies ADD COLUMN isTelegram INTEGER DEFAULT 0');
+
+      await db.execute('ALTER TABLE episodes ADD COLUMN telegramFileId TEXT');
+      await db.execute('ALTER TABLE episodes ADD COLUMN telegramAccessHash TEXT');
+      await db.execute('ALTER TABLE episodes ADD COLUMN telegramPeerId TEXT');
+      await db.execute('ALTER TABLE episodes ADD COLUMN telegramFileName TEXT');
+      await db.execute('ALTER TABLE episodes ADD COLUMN telegramFileSize INTEGER');
+      await db.execute('ALTER TABLE episodes ADD COLUMN isTelegram INTEGER DEFAULT 0');
+    }
+    if (oldVersion < 4) {
+      await db.execute('ALTER TABLE movies ADD COLUMN category TEXT');
+      await db.execute('ALTER TABLE series ADD COLUMN category TEXT');
+    }
   }
 
   // Movie CRUD

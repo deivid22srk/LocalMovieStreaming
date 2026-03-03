@@ -4,6 +4,8 @@ import 'package:file_picker/file_picker.dart';
 import '../../providers/movie_provider.dart';
 import '../../models/movie_models.dart';
 import '../widgets/app_image.dart';
+import '../../services/telegram_service.dart';
+import 'telegram_selector_screen.dart';
 
 class AddItemScreen extends StatefulWidget {
   const AddItemScreen({super.key});
@@ -25,6 +27,14 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
   final TextEditingController _manualUrlCtrl = TextEditingController();
   final TextEditingController _webUrlCtrl = TextEditingController();
   final TextEditingController _dateCtrl = TextEditingController();
+  final TextEditingController _categoryCtrl = TextEditingController();
+
+  // Telegram Capture data
+  String? _tgFileId;
+  String? _tgFileName;
+  int? _tgFileSize;
+  int? _tgAccessHash;
+  List<int>? _tgFileReference;
 
   List<dynamic> _searchResults = [];
   bool _isLoading = false;
@@ -75,6 +85,7 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
         backdropPath: _backdropCtrl.text,
         voteAverage: 0.0,
         firstAirDate: _dateCtrl.text,
+        category: _categoryCtrl.text,
       ));
     } else {
       await provider.addMovie(Movie(
@@ -86,11 +97,36 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
         webPlayerUrl: _webUrlCtrl.text,
         voteAverage: 0.0,
         releaseDate: _dateCtrl.text,
+        telegramFileId: _tgFileId,
+        telegramFileName: _tgFileName,
+        telegramFileSize: _tgFileSize,
+        telegramAccessHash: _tgAccessHash?.toString(),
+        category: _categoryCtrl.text,
+        isTelegram: _tgFileId != null,
       ));
     }
 
     setState(() => _isLoading = false);
     if (mounted) Navigator.pop(context);
+  }
+
+  void _captureTelegram() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(builder: (_) => const TelegramSelectorScreen()),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _tgFileId = result['id'];
+        _tgFileName = result['fileName'];
+        _tgFileSize = result['size'];
+        _tgAccessHash = result['accessHash'];
+        _tgFileReference = result['fileReference'];
+        _manualUrlCtrl.text = 'TELEGRAM: ${_tgFileName}';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vídeo do Telegram selecionado!')));
+    }
   }
 
   void _showAddDialog(dynamic item) {
@@ -237,10 +273,19 @@ class _AddItemScreenState extends State<AddItemScreen> with SingleTickerProvider
           TextField(controller: _titleCtrl, decoration: const InputDecoration(labelText: 'Título')),
           TextField(controller: _overviewCtrl, decoration: const InputDecoration(labelText: 'Sinopse'), maxLines: 3),
           TextField(controller: _dateCtrl, decoration: const InputDecoration(labelText: 'Data de Lançamento (Ex: 2024-01-01)')),
+          TextField(controller: _categoryCtrl, decoration: const InputDecoration(labelText: 'Categoria')),
           if (!_manualIsSeries) ...[
             TextField(controller: _manualUrlCtrl, decoration: const InputDecoration(labelText: 'URL do Vídeo')),
             TextField(controller: _webUrlCtrl, decoration: const InputDecoration(labelText: 'URL do Player Web (Opcional)')),
           ],
+          const SizedBox(height: 20),
+          if (!_manualIsSeries)
+            ElevatedButton.icon(
+              icon: const Icon(Icons.send),
+              onPressed: _captureTelegram,
+              label: const Text('CAPTURAR DO TELEGRAM'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+            ),
           const SizedBox(height: 20),
           _buildImagePickerRow('Capa (Poster)', _posterCtrl),
           const SizedBox(height: 10),

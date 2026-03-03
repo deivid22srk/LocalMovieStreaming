@@ -10,6 +10,13 @@ class Movie {
   final String releaseDate;
   final int watchProgress; // in milliseconds
   final int duration; // in milliseconds
+  final String? telegramFileId;
+  final String? telegramAccessHash;
+  final String? telegramPeerId;
+  final String? telegramFileName;
+  final int? telegramFileSize;
+  final String? category;
+  final bool isTelegram;
 
   Movie({
     this.id,
@@ -23,6 +30,13 @@ class Movie {
     required this.releaseDate,
     this.watchProgress = 0,
     this.duration = 0,
+    this.telegramFileId,
+    this.telegramAccessHash,
+    this.telegramPeerId,
+    this.telegramFileName,
+    this.telegramFileSize,
+    this.category,
+    this.isTelegram = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -38,6 +52,13 @@ class Movie {
       'releaseDate': releaseDate,
       'watchProgress': watchProgress,
       'duration': duration,
+      'telegramFileId': telegramFileId,
+      'telegramAccessHash': telegramAccessHash,
+      'telegramPeerId': telegramPeerId,
+      'telegramFileName': telegramFileName,
+      'telegramFileSize': telegramFileSize,
+      'category': category,
+      'isTelegram': isTelegram ? 1 : 0,
     };
   }
 
@@ -54,6 +75,13 @@ class Movie {
       releaseDate: map['releaseDate'],
       watchProgress: map['watchProgress'] ?? 0,
       duration: map['duration'] ?? 0,
+      telegramFileId: map['telegramFileId'],
+      telegramAccessHash: map['telegramAccessHash'],
+      telegramPeerId: map['telegramPeerId'],
+      telegramFileName: map['telegramFileName'],
+      telegramFileSize: map['telegramFileSize'],
+      category: map['category'],
+      isTelegram: map['isTelegram'] == 1,
     );
   }
 }
@@ -66,6 +94,7 @@ class Series {
   final String backdropPath;
   final double voteAverage;
   final String firstAirDate;
+  final String? category;
 
   Series({
     this.id,
@@ -75,6 +104,7 @@ class Series {
     required this.backdropPath,
     required this.voteAverage,
     required this.firstAirDate,
+    this.category,
   });
 
   Map<String, dynamic> toMap() {
@@ -86,6 +116,7 @@ class Series {
       'backdropPath': backdropPath,
       'voteAverage': voteAverage,
       'firstAirDate': firstAirDate,
+      'category': category,
     };
   }
 
@@ -98,6 +129,7 @@ class Series {
       backdropPath: map['backdropPath'],
       voteAverage: map['voteAverage'],
       firstAirDate: map['firstAirDate'],
+      category: map['category'],
     );
   }
 }
@@ -153,6 +185,12 @@ class Episode {
   final String webPlayerUrl;
   final int watchProgress;
   final int duration;
+  final String? telegramFileId;
+  final String? telegramAccessHash;
+  final String? telegramPeerId;
+  final String? telegramFileName;
+  final int? telegramFileSize;
+  final bool isTelegram;
 
   Episode({
     this.id,
@@ -165,6 +203,12 @@ class Episode {
     this.webPlayerUrl = '',
     this.watchProgress = 0,
     this.duration = 0,
+    this.telegramFileId,
+    this.telegramAccessHash,
+    this.telegramPeerId,
+    this.telegramFileName,
+    this.telegramFileSize,
+    this.isTelegram = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -179,6 +223,12 @@ class Episode {
       'webPlayerUrl': webPlayerUrl,
       'watchProgress': watchProgress,
       'duration': duration,
+      'telegramFileId': telegramFileId,
+      'telegramAccessHash': telegramAccessHash,
+      'telegramPeerId': telegramPeerId,
+      'telegramFileName': telegramFileName,
+      'telegramFileSize': telegramFileSize,
+      'isTelegram': isTelegram ? 1 : 0,
     };
   }
 
@@ -194,6 +244,12 @@ class Episode {
       webPlayerUrl: map['webPlayerUrl'] ?? '',
       watchProgress: map['watchProgress'] ?? 0,
       duration: map['duration'] ?? 0,
+      telegramFileId: map['telegramFileId'],
+      telegramAccessHash: map['telegramAccessHash'],
+      telegramPeerId: map['telegramPeerId'],
+      telegramFileName: map['telegramFileName'],
+      telegramFileSize: map['telegramFileSize'],
+      isTelegram: map['isTelegram'] == 1,
     );
   }
 }

@@ -16,14 +16,11 @@ void main() {
         providers: [
           ChangeNotifierProvider(create: (context) => MovieProvider()),
         ],
-        child: const MyApp(),
+        child: const MyApp(isFirstRun: true),
       ),
     );
 
-    // Verify that the app title is present (we changed it to Local Movie Player)
-    expect(find.text('Local Movie Player'), findsOneWidget);
-
-    // Verify that the empty state message is present since we have no movies
-    expect(find.text('Nenhum conteúdo adicionado'), findsOneWidget);
+    // Verify that the welcome text is present since we are in InitialSetupScreen
+    expect(find.text('Bem-vindo ao Local Movie Player'), findsOneWidget);
   });
 }

@@ -33,7 +33,8 @@
             android:name=".VlcPlayerActivity"
             android:theme="@style/Theme.AppCompat.NoActionBar"
             android:screenOrientation="landscape"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|screenLayout|density|uiMode"
+            android:supportsPictureInPicture="true"
             android:exported="false" />
 
         <meta-data

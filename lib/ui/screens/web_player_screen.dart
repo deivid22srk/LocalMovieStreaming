@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class WebPlayerScreen extends StatefulWidget {
@@ -15,6 +16,7 @@ class _WebPlayerScreenState extends State<WebPlayerScreen> {
   late final WebViewController _controller;
   bool _isLoading = true;
   String? _errorMessage;
+  bool _isFullScreen = false;
 
   @override
   void initState() {
@@ -48,19 +50,53 @@ class _WebPlayerScreenState extends State<WebPlayerScreen> {
       ..loadRequest(Uri.parse(widget.url));
   }
 
+  void _toggleFullScreen() {
+    setState(() {
+      _isFullScreen = !_isFullScreen;
+      if (_isFullScreen) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      } else {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: Text(widget.title, style: const TextStyle(fontSize: 16)),
-        backgroundColor: Colors.black,
-      ),
+      appBar: _isFullScreen
+          ? null
+          : AppBar(
+              title: Text(widget.title, style: const TextStyle(fontSize: 16)),
+              backgroundColor: Colors.black,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.fullscreen),
+                  onPressed: _toggleFullScreen,
+                ),
+              ],
+            ),
       body: Stack(
         children: [
           WebViewWidget(controller: _controller),
           if (_isLoading)
             const Center(child: CircularProgressIndicator(color: Colors.purple)),
+          if (_isFullScreen)
+            Positioned(
+              top: 10,
+              right: 10,
+              child: IconButton(
+                icon: const Icon(Icons.fullscreen_exit, color: Colors.white70),
+                onPressed: _toggleFullScreen,
+              ),
+            ),
           if (_errorMessage != null)
              Center(
                child: Container(

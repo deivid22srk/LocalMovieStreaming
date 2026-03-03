@@ -1,12 +1,55 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:archive/archive_io.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:http/http.dart' as http;
 
 class StorageService {
+  Future<String?> generateZip() async {
+    final dbPath = p.join(await getDatabasesPath(), 'movie_streaming.db');
+    final dbFile = File(dbPath);
+
+    if (!dbFile.existsSync()) return null;
+
+    final archive = Archive();
+
+    // Add DB file to archive
+    final dbBytes = await dbFile.readAsBytes();
+    archive.addFile(ArchiveFile('movie_streaming.db', dbBytes.length, dbBytes));
+
+    // Add local images to archive
+    final appDir = await getApplicationDocumentsDirectory();
+    final imagesDir = Directory(p.join(appDir.path, 'images'));
+    if (imagesDir.existsSync()) {
+      final imageFiles = imagesDir.listSync();
+      for (final file in imageFiles) {
+        if (file is File) {
+          final bytes = await file.readAsBytes();
+          archive.addFile(ArchiveFile('images/${p.basename(file.path)}', bytes.length, bytes));
+        }
+      }
+    }
+
+    final zipEncoder = ZipEncoder();
+    final zipData = zipEncoder.encode(archive);
+
+    if (zipData == null) return null;
+
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final zipPath = p.join(tempDir.path, 'local_movie_backup.zip');
+      final zipFile = File(zipPath);
+      await zipFile.writeAsBytes(zipData);
+      return zipPath;
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<String?> exportData() async {
     final dbPath = p.join(await getDatabasesPath(), 'movie_streaming.db');
     final dbFile = File(dbPath);
@@ -62,6 +105,13 @@ class StorageService {
     if (result != null && result.files.single.path != null) {
       final file = File(result.files.single.path!);
       final bytes = await file.readAsBytes();
+      return await _applyBackup(bytes);
+    }
+    return false;
+  }
+
+  Future<bool> _applyBackup(List<int> bytes) async {
+    try {
       final archive = ZipDecoder().decodeBytes(bytes);
 
       final appDir = await getApplicationDocumentsDirectory();
@@ -80,7 +130,72 @@ class StorageService {
         }
       }
       return true;
+    } catch (e) {
+      print('Error applying backup: $e');
+      return false;
     }
-    return false;
+  }
+
+  Future<String?> restoreFromTelegram(String botToken) async {
+    try {
+      // Get the last updates to find the backup file
+      final response = await http.get(Uri.parse('https://api.telegram.org/bot$botToken/getUpdates?limit=10&offset=-10'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['ok'] == true && (data['result'] as List).isNotEmpty) {
+          final results = List.from(data['result']).reversed;
+          for (var update in results) {
+            final message = update['message'] ?? update['channel_post'];
+            if (message != null && message['document'] != null) {
+              final doc = message['document'];
+              final fileName = doc['file_name'] ?? '';
+              if (fileName.contains('local_movie_backup') && fileName.endsWith('.zip')) {
+                final fileId = doc['file_id'];
+
+                // Get file path from Telegram
+                final fileInfoResp = await http.get(Uri.parse('https://api.telegram.org/bot$botToken/getFile?file_id=$fileId'));
+                final fileInfo = json.decode(fileInfoResp.body);
+
+                if (fileInfo['ok'] == true) {
+                  final filePath = fileInfo['result']['file_path'];
+                  final downloadUrl = 'https://api.telegram.org/file/bot$botToken/$filePath';
+
+                  // Download and apply
+                  final bytes = await http.readBytes(Uri.parse(downloadUrl));
+                  final success = await _applyBackup(bytes);
+                  return success ? 'Restauração via Telegram concluída!' : 'Erro ao processar arquivo de backup.';
+                }
+              }
+            }
+          }
+        }
+      }
+      return 'Nenhum backup ZIP recente encontrado no Telegram.';
+    } catch (e) {
+      return 'Erro na restauração: $e';
+    }
+  }
+
+  Future<String?> backupToTelegram(String botToken, String chatId) async {
+    try {
+      final zipPath = await generateZip();
+      if (zipPath == null) return 'Erro ao gerar ZIP';
+
+      final file = File(zipPath);
+      final request = http.MultipartRequest('POST', Uri.parse('https://api.telegram.org/bot$botToken/sendDocument'));
+      request.fields['chat_id'] = chatId;
+      request.fields['caption'] = 'Backup Local Movie Player - ${DateTime.now()}';
+      request.files.add(await http.MultipartFile.fromPath('document', file.path));
+
+      final response = await request.send();
+      if (response.statusCode == 200) {
+        return 'Backup enviado para o Telegram com sucesso!';
+      } else {
+        final body = await response.stream.bytesToString();
+        return 'Erro no envio: ${response.statusCode} - $body';
+      }
+    } catch (e) {
+      return 'Erro: $e';
+    }
   }
 }
